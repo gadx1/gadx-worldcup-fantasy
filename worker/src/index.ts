@@ -38,6 +38,32 @@ async function getDatabaseHealth(env: Env) {
   }
 }
 
+async function getTableCount(env: Env, tableName: string) {
+  const result = await env.DB.prepare(`SELECT COUNT(*) AS row_count FROM ${tableName}`).first<{
+    row_count: number
+  }>()
+
+  return {
+    table_name: tableName,
+    row_count: result?.row_count ?? 0,
+  }
+}
+
+async function getTableCounts(env: Env) {
+  const tableNames = [
+    'audit_log',
+    'matches',
+    'players',
+    'scoring_rules',
+    'teams',
+    'tournament_users',
+    'tournaments',
+    'users',
+  ]
+
+  return Promise.all(tableNames.map((tableName) => getTableCount(env, tableName)))
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
@@ -59,6 +85,15 @@ export default {
         version: '0.1.0',
         database,
         timestamp: new Date().toISOString(),
+      })
+    }
+
+    if (url.pathname === '/api/debug/counts' && request.method === 'GET') {
+      const counts = await getTableCounts(env)
+
+      return jsonResponse({
+        ok: true,
+        counts,
       })
     }
 
