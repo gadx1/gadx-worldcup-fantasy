@@ -1,22 +1,23 @@
+import { useState } from 'react'
 import { AppFooter } from './components/AppFooter'
 import { AppHeader } from './components/AppHeader'
 import { AppNavigation } from './components/AppNavigation'
+import { DrawControlPanel } from './components/DrawControlPanel'
 import { EligibleTeamsPanel } from './components/EligibleTeamsPanel'
-import { FairDrawPreview } from './components/FairDrawPreview'
 import { FeatureSections } from './components/FeatureSections'
 import { LeaderboardPanel } from './components/LeaderboardPanel'
 import { MatchResultsPanel } from './components/MatchResultsPanel'
 import { MetricCard } from './components/MetricCard'
 import { adminSections, viewerSections } from './data/appSections'
-import { mockDraw, mockTeamAssignments } from './data/mockDraw'
 import { mockMatches } from './data/mockMatches'
 import { mockPlayers } from './data/mockPlayers'
 import { mockScoringRules } from './data/mockScoringRules'
 import { mockTeams } from './data/mockTeams'
 import { mockTournaments } from './data/mockTournaments'
-import { getDrawReadiness } from './lib/draw'
+import { getDrawReadiness, runFairDraw } from './lib/draw'
 import { getEligibleTeams, getIneligibleTeams } from './lib/eligibility'
 import { calculateStandings } from './lib/scoring'
+import type { TeamAssignment } from './types/domain'
 
 function App() {
   const activeTournament = mockTournaments[0]
@@ -27,19 +28,43 @@ function App() {
   const ineligibleTeams = getIneligibleTeams(mockTeams, mockMatches, activeTournament)
   const drawReadiness = getDrawReadiness(tournamentPlayers, eligibleTeams)
 
-  const assignments = mockTeamAssignments.filter(
-    (assignment) => assignment.drawId === mockDraw.id,
-  )
+  const [draftAssignments, setDraftAssignments] = useState<TeamAssignment[]>([])
+  const [lockedAssignments, setLockedAssignments] = useState<TeamAssignment[]>([])
+
+  const activeAssignments =
+    lockedAssignments.length > 0
+      ? lockedAssignments
+      : draftAssignments.length > 0
+        ? draftAssignments
+        : []
 
   const standings = calculateStandings(
     tournamentPlayers,
-    assignments,
+    activeAssignments,
     mockMatches,
     mockScoringRules,
     activeTournament.id,
   )
 
   const completedMatchCount = mockMatches.filter((match) => match.status === 'fulltime').length
+
+  function handleRunDraw() {
+    if (!drawReadiness.canRunDraw) {
+      return
+    }
+
+    const assignments = runFairDraw(tournamentPlayers, eligibleTeams)
+    setDraftAssignments(assignments)
+  }
+
+  function handleSaveAndLockDraw() {
+    if (draftAssignments.length === 0 || lockedAssignments.length > 0) {
+      return
+    }
+
+    setLockedAssignments(draftAssignments)
+    setDraftAssignments([])
+  }
 
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
@@ -61,18 +86,21 @@ function App() {
             drawReadiness={drawReadiness}
           />
 
-          <FairDrawPreview
+          <DrawControlPanel
             players={tournamentPlayers}
             teams={mockTeams}
-            assignments={assignments}
+            draftAssignments={draftAssignments}
+            lockedAssignments={lockedAssignments}
             drawReadiness={drawReadiness}
+            onRunDraw={handleRunDraw}
+            onSaveAndLock={handleSaveAndLockDraw}
           />
         </section>
 
         <LeaderboardPanel
           players={tournamentPlayers}
           teams={mockTeams}
-          assignments={assignments}
+          assignments={activeAssignments}
           standings={standings}
         />
 
