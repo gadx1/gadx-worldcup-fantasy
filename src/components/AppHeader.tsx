@@ -1,4 +1,8 @@
-export function AppHeader() {
+interface AppHeaderProps {
+  milestone: string
+}
+
+export function AppHeader({ milestone }: AppHeaderProps) {
   return (
     <header className="flex flex-col gap-5 rounded-3xl border border-emerald-900/10 bg-white/70 p-6 shadow-sm backdrop-blur md:flex-row md:items-center md:justify-between">
       <div>
@@ -19,7 +23,7 @@ export function AppHeader() {
           V1 Status
         </p>
         <p className="mt-2 text-2xl font-semibold">Local Prototype</p>
-        <p className="mt-1 text-sm text-slate-300">Milestone 2.2</p>
+        <p className="mt-1 text-sm text-slate-300">{milestone}</p>
       </div>
     </header>
   )

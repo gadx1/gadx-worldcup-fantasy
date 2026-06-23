@@ -9,6 +9,7 @@ interface DrawControlPanelProps {
   drawReadiness: DrawReadiness
   onRunDraw: () => void
   onSaveAndLock: () => void
+  onResetLockedDraw: () => void
 }
 
 function getTeamById(teams: Team[], teamId: string) {
@@ -23,6 +24,7 @@ export function DrawControlPanel({
   drawReadiness,
   onRunDraw,
   onSaveAndLock,
+  onResetLockedDraw,
 }: DrawControlPanelProps) {
   const hasDraft = draftAssignments.length > 0
   const hasLockedDraw = lockedAssignments.length > 0
@@ -79,7 +81,7 @@ export function DrawControlPanel({
       )}
 
       {drawReadiness.canRunDraw && (
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <button
             className="rounded-full bg-emerald-300 px-5 py-3 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-slate-500"
             disabled={hasLockedDraw}
@@ -97,12 +99,28 @@ export function DrawControlPanel({
           >
             Save & Lock Draw
           </button>
+
+          <button
+            className="rounded-full border border-red-300/20 bg-red-300/10 px-5 py-3 text-sm font-semibold text-red-100 transition hover:bg-red-300/20 disabled:hidden"
+            disabled={!hasLockedDraw}
+            onClick={onResetLockedDraw}
+            type="button"
+          >
+            Reset Local Draw
+          </button>
         </div>
       )}
 
       {!hasDraft && !hasLockedDraw && (
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5 text-slate-300">
           No draw has been generated yet. Run the draw to preview the first team assignment.
+        </div>
+      )}
+
+      {hasLockedDraw && (
+        <div className="mt-6 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-5 text-emerald-100">
+          This draw is saved locally in your browser. Refreshing the page will keep the locked
+          assignment during local development.
         </div>
       )}
 

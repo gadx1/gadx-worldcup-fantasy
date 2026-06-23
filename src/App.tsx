@@ -14,10 +14,15 @@ import { mockPlayers } from './data/mockPlayers'
 import { mockScoringRules } from './data/mockScoringRules'
 import { mockTeams } from './data/mockTeams'
 import { mockTournaments } from './data/mockTournaments'
+import { useLocalStorageState } from './hooks/useLocalStorageState'
 import { getDrawReadiness, runFairDraw } from './lib/draw'
 import { getEligibleTeams, getIneligibleTeams } from './lib/eligibility'
 import { calculateStandings } from './lib/scoring'
 import type { TeamAssignment } from './types/domain'
+
+const localStorageKeys = {
+  lockedAssignments: 'gadx-worldcup-draw:locked-assignments',
+}
 
 function App() {
   const activeTournament = mockTournaments[0]
@@ -29,7 +34,9 @@ function App() {
   const drawReadiness = getDrawReadiness(tournamentPlayers, eligibleTeams)
 
   const [draftAssignments, setDraftAssignments] = useState<TeamAssignment[]>([])
-  const [lockedAssignments, setLockedAssignments] = useState<TeamAssignment[]>([])
+  const [lockedAssignments, setLockedAssignments, resetLockedAssignments] = useLocalStorageState<
+    TeamAssignment[]
+  >(localStorageKeys.lockedAssignments, [])
 
   const activeAssignments =
     lockedAssignments.length > 0
@@ -66,10 +73,15 @@ function App() {
     setDraftAssignments([])
   }
 
+  function handleResetLockedDraw() {
+    resetLockedAssignments()
+    setDraftAssignments([])
+  }
+
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <AppHeader />
+        <AppHeader milestone="Milestone 2.7" />
         <AppNavigation />
 
         <section className="grid gap-4 md:grid-cols-4">
@@ -94,6 +106,7 @@ function App() {
             drawReadiness={drawReadiness}
             onRunDraw={handleRunDraw}
             onSaveAndLock={handleSaveAndLockDraw}
+            onResetLockedDraw={handleResetLockedDraw}
           />
         </section>
 
