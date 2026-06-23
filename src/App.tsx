@@ -1,46 +1,17 @@
-const adminSections = [
-  {
-    title: 'Create New Tournament',
-    description: 'Set up a private fantasy tournament, define the active round window, and prepare the player list.',
-    status: 'Admin',
-  },
-  {
-    title: 'Manage Players',
-    description: 'Create up to six players, assign avatars, and link viewer emails when invitations are enabled.',
-    status: 'Admin',
-  },
-  {
-    title: 'Eligible Teams',
-    description: 'Review active national teams, validate the round window, and confirm the pool before the draw.',
-    status: 'Admin',
-  },
-  {
-    title: 'Run Draw',
-    description: 'Randomly assign teams equally across all players, lock the draw, and keep an audit trail.',
-    status: 'Admin',
-  },
-]
-
-const viewerSections = [
-  {
-    title: 'My Teams',
-    description: 'View the national teams assigned to your player profile in each tournament.',
-  },
-  {
-    title: 'Leaderboard',
-    description: 'Track player rankings, match points, bonus points, and total tournament score.',
-  },
-  {
-    title: 'Match Results',
-    description: 'Follow real match outcomes, goals, halftime updates, and full-time results.',
-  },
-  {
-    title: 'Tournament Progress',
-    description: 'See how the tournament advances from group stage to knockout rounds.',
-  },
-]
+import { adminSections, viewerSections } from './data/appSections'
+import { mockMatches } from './data/mockMatches'
+import { mockPlayers } from './data/mockPlayers'
+import { mockTeams } from './data/mockTeams'
+import { mockTournaments } from './data/mockTournaments'
 
 function App() {
+  const activeTournament = mockTournaments[0]
+  const playerCount = mockPlayers.filter(
+    (player) => player.tournamentId === activeTournament.id,
+  ).length
+  const activeTeamCount = mockTeams.filter((team) => team.tournamentStatus === 'active').length
+  const scheduledMatchCount = mockMatches.filter((match) => match.status === 'scheduled').length
+
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
@@ -63,21 +34,53 @@ function App() {
               V1 Status
             </p>
             <p className="mt-2 text-2xl font-semibold">Local Prototype</p>
-            <p className="mt-1 text-sm text-slate-300">Milestone 1</p>
+            <p className="mt-1 text-sm text-slate-300">Milestone 2 Prep</p>
           </div>
         </header>
 
         <nav className="flex flex-wrap gap-3 rounded-2xl border border-slate-900/10 bg-white/60 p-3 shadow-sm">
-          {['Tournaments', 'Players', 'Teams', 'Draw', 'Leaderboard', 'Results', 'Rules'].map((item) => (
-            <button
-              key={item}
-              className="rounded-full border border-slate-900/10 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-emerald-700 hover:text-emerald-800"
-              type="button"
-            >
-              {item}
-            </button>
-          ))}
+          {['Tournaments', 'Players', 'Teams', 'Draw', 'Leaderboard', 'Results', 'Rules'].map(
+            (item) => (
+              <button
+                key={item}
+                className="rounded-full border border-slate-900/10 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-emerald-700 hover:text-emerald-800"
+                type="button"
+              >
+                {item}
+              </button>
+            ),
+          )}
         </nav>
+
+        <section className="grid gap-4 md:grid-cols-4">
+          <div className="rounded-2xl border border-slate-900/10 bg-white/75 p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              Tournament
+            </p>
+            <p className="mt-2 text-xl font-semibold text-slate-950">{activeTournament.name}</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-900/10 bg-white/75 p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              Players
+            </p>
+            <p className="mt-2 text-xl font-semibold text-slate-950">{playerCount} / 6</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-900/10 bg-white/75 p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              Active Teams
+            </p>
+            <p className="mt-2 text-xl font-semibold text-slate-950">{activeTeamCount}</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-900/10 bg-white/75 p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              Scheduled Matches
+            </p>
+            <p className="mt-2 text-xl font-semibold text-slate-950">{scheduledMatchCount}</p>
+          </div>
+        </section>
 
         <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <article className="rounded-3xl bg-slate-950 p-8 text-white shadow-xl">
@@ -99,7 +102,7 @@ function App() {
                   className="rounded-2xl border border-white/10 bg-white/5 p-5"
                 >
                   <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-semibold text-emerald-200">
-                    {section.status}
+                    Admin
                   </span>
                   <h3 className="mt-4 text-lg font-semibold">{section.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-slate-300">{section.description}</p>
