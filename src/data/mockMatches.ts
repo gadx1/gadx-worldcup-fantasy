@@ -7,8 +7,8 @@ export const mockMatches: Match[] = [
     awayTeamId: 'canada',
     kickoffUtc: '2026-06-25T19:00:00.000Z',
     roundName: 'Round 1 Test Window',
-    status: 'scheduled',
-    homeScore: 0,
+    status: 'fulltime',
+    homeScore: 2,
     awayScore: 0,
   },
   {
@@ -17,9 +17,9 @@ export const mockMatches: Match[] = [
     awayTeamId: 'japan',
     kickoffUtc: '2026-06-26T19:00:00.000Z',
     roundName: 'Round 1 Test Window',
-    status: 'scheduled',
-    homeScore: 0,
-    awayScore: 0,
+    status: 'fulltime',
+    homeScore: 1,
+    awayScore: 1,
   },
   {
     id: 'match-003',
