@@ -9,6 +9,7 @@ import { LeaderboardPanel } from './components/LeaderboardPanel'
 import { MatchResultsPanel } from './components/MatchResultsPanel'
 import { MetricCard } from './components/MetricCard'
 import { PlayerSetupPanel } from './components/PlayerSetupPanel'
+import { TournamentSetupPanel } from './components/TournamentSetupPanel'
 import { adminSections, viewerSections } from './data/appSections'
 import { mockMatches } from './data/mockMatches'
 import { mockPlayers } from './data/mockPlayers'
@@ -19,19 +20,25 @@ import { useLocalStorageState } from './hooks/useLocalStorageState'
 import { getDrawReadiness, runFairDraw } from './lib/draw'
 import { getEligibleTeams, getIneligibleTeams } from './lib/eligibility'
 import { calculateStandings } from './lib/scoring'
-import type { Player, TeamAssignment } from './types/domain'
+import type { Player, TeamAssignment, Tournament } from './types/domain'
 
 const localStorageKeys = {
   lockedAssignments: 'gadx-worldcup-draw:locked-assignments',
   players: 'gadx-worldcup-draw:players',
+  tournament: 'gadx-worldcup-draw:tournament',
 }
 
 function App() {
-  const activeTournament = mockTournaments[0]
+  const defaultTournament = mockTournaments[0]
+
+  const [activeTournament, setActiveTournament, resetTournament] =
+    useLocalStorageState<Tournament>(localStorageKeys.tournament, defaultTournament)
+
   const [players, setPlayers, resetPlayers] = useLocalStorageState<Player[]>(
     localStorageKeys.players,
     mockPlayers,
   )
+
   const tournamentPlayers = players.filter((player) => player.tournamentId === activeTournament.id)
 
   const eligibleTeams = getEligibleTeams(mockTeams, mockMatches, activeTournament)
@@ -85,6 +92,29 @@ function App() {
     setDraftAssignments([])
   }
 
+  function handleUpdateTournament(updates: Partial<Tournament>) {
+    if (isDrawLocked) {
+      return
+    }
+
+    setActiveTournament((currentTournament) => ({
+      ...currentTournament,
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    }))
+
+    setDraftAssignments([])
+  }
+
+  function handleResetTournament() {
+    if (isDrawLocked) {
+      return
+    }
+
+    resetTournament()
+    setDraftAssignments([])
+  }
+
   function handleUpdatePlayer(playerId: string, updates: Partial<Player>) {
     if (isDrawLocked) {
       return
@@ -116,7 +146,7 @@ function App() {
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <AppHeader milestone="Milestone 2.8" />
+        <AppHeader milestone="Milestone 2.9" />
         <AppNavigation />
 
         <section className="grid gap-4 md:grid-cols-4">
@@ -125,6 +155,13 @@ function App() {
           <MetricCard label="Eligible Teams" value={drawReadiness.eligibleTeamCount} />
           <MetricCard label="Completed Matches" value={completedMatchCount} />
         </section>
+
+        <TournamentSetupPanel
+          tournament={activeTournament}
+          isLocked={isDrawLocked}
+          onUpdateTournament={handleUpdateTournament}
+          onResetTournament={handleResetTournament}
+        />
 
         <PlayerSetupPanel
           players={tournamentPlayers}
