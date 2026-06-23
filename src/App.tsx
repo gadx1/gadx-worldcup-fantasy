@@ -6,6 +6,7 @@ import { DrawControlPanel } from './components/DrawControlPanel'
 import { EligibleTeamsPanel } from './components/EligibleTeamsPanel'
 import { FeatureSections } from './components/FeatureSections'
 import { LeaderboardPanel } from './components/LeaderboardPanel'
+import { MatchAdminPanel } from './components/MatchAdminPanel'
 import { MatchResultsPanel } from './components/MatchResultsPanel'
 import { MetricCard } from './components/MetricCard'
 import { PlayerSetupPanel } from './components/PlayerSetupPanel'
@@ -20,10 +21,11 @@ import { useLocalStorageState } from './hooks/useLocalStorageState'
 import { getDrawReadiness, runFairDraw } from './lib/draw'
 import { getEligibleTeams, getIneligibleTeams } from './lib/eligibility'
 import { calculateStandings } from './lib/scoring'
-import type { Player, TeamAssignment, Tournament } from './types/domain'
+import type { Match, Player, TeamAssignment, Tournament } from './types/domain'
 
 const localStorageKeys = {
   lockedAssignments: 'gadx-worldcup-draw:locked-assignments',
+  matches: 'gadx-worldcup-draw:matches',
   players: 'gadx-worldcup-draw:players',
   tournament: 'gadx-worldcup-draw:tournament',
 }
@@ -39,10 +41,15 @@ function App() {
     mockPlayers,
   )
 
+  const [matches, setMatches, resetMatches] = useLocalStorageState<Match[]>(
+    localStorageKeys.matches,
+    mockMatches,
+  )
+
   const tournamentPlayers = players.filter((player) => player.tournamentId === activeTournament.id)
 
-  const eligibleTeams = getEligibleTeams(mockTeams, mockMatches, activeTournament)
-  const ineligibleTeams = getIneligibleTeams(mockTeams, mockMatches, activeTournament)
+  const eligibleTeams = getEligibleTeams(mockTeams, matches, activeTournament)
+  const ineligibleTeams = getIneligibleTeams(mockTeams, matches, activeTournament)
   const drawReadiness = getDrawReadiness(tournamentPlayers, eligibleTeams)
 
   const [draftAssignments, setDraftAssignments] = useState<TeamAssignment[]>([])
@@ -62,12 +69,12 @@ function App() {
   const standings = calculateStandings(
     tournamentPlayers,
     activeAssignments,
-    mockMatches,
+    matches,
     mockScoringRules,
     activeTournament.id,
   )
 
-  const completedMatchCount = mockMatches.filter((match) => match.status === 'fulltime').length
+  const completedMatchCount = matches.filter((match) => match.status === 'fulltime').length
 
   function handleRunDraw() {
     if (!drawReadiness.canRunDraw) {
@@ -143,10 +150,27 @@ function App() {
     setDraftAssignments([])
   }
 
+  function handleUpdateMatch(matchId: string, updates: Partial<Match>) {
+    setMatches((currentMatches) =>
+      currentMatches.map((match) =>
+        match.id === matchId
+          ? {
+              ...match,
+              ...updates,
+            }
+          : match,
+      ),
+    )
+  }
+
+  function handleResetMatches() {
+    resetMatches()
+  }
+
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <AppHeader milestone="Milestone 2.9" />
+        <AppHeader milestone="Milestone 2.10" />
         <AppNavigation />
 
         <section className="grid gap-4 md:grid-cols-4">
@@ -207,8 +231,15 @@ function App() {
           standings={standings}
         />
 
+        <MatchAdminPanel
+          matches={matches}
+          teams={mockTeams}
+          onUpdateMatch={handleUpdateMatch}
+          onResetMatches={handleResetMatches}
+        />
+
         <MatchResultsPanel
-          matches={mockMatches}
+          matches={matches}
           teams={mockTeams}
           scoringRules={mockScoringRules}
         />
