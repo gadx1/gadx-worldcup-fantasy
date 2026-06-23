@@ -7,12 +7,13 @@ import { FeatureSections } from './components/FeatureSections'
 import { LeaderboardPanel } from './components/LeaderboardPanel'
 import { MetricCard } from './components/MetricCard'
 import { adminSections, viewerSections } from './data/appSections'
+import { mockDraw, mockTeamAssignments } from './data/mockDraw'
 import { mockMatches } from './data/mockMatches'
 import { mockPlayers } from './data/mockPlayers'
 import { mockScoringRules } from './data/mockScoringRules'
 import { mockTeams } from './data/mockTeams'
 import { mockTournaments } from './data/mockTournaments'
-import { getDrawReadiness, runFairDraw } from './lib/draw'
+import { getDrawReadiness } from './lib/draw'
 import { getEligibleTeams, getIneligibleTeams } from './lib/eligibility'
 import { calculateStandings } from './lib/scoring'
 
@@ -24,16 +25,19 @@ function App() {
   const eligibleTeams = getEligibleTeams(mockTeams, mockMatches, activeTournament)
   const ineligibleTeams = getIneligibleTeams(mockTeams, mockMatches, activeTournament)
   const drawReadiness = getDrawReadiness(tournamentPlayers, eligibleTeams)
-  const demoAssignments = drawReadiness.canRunDraw
-    ? runFairDraw(tournamentPlayers, eligibleTeams)
-    : []
+
+  const assignments = mockTeamAssignments.filter(
+    (assignment) => assignment.drawId === mockDraw.id,
+  )
+
   const standings = calculateStandings(
     tournamentPlayers,
-    demoAssignments,
+    assignments,
     mockMatches,
     mockScoringRules,
     activeTournament.id,
   )
+
   const completedMatchCount = mockMatches.filter((match) => match.status === 'fulltime').length
 
   return (
@@ -59,7 +63,7 @@ function App() {
           <FairDrawPreview
             players={tournamentPlayers}
             teams={mockTeams}
-            assignments={demoAssignments}
+            assignments={assignments}
             drawReadiness={drawReadiness}
           />
         </section>
@@ -67,7 +71,7 @@ function App() {
         <LeaderboardPanel
           players={tournamentPlayers}
           teams={mockTeams}
-          assignments={demoAssignments}
+          assignments={assignments}
           standings={standings}
         />
 

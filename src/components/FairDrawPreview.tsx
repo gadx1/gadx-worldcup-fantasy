@@ -17,10 +17,10 @@ export function FairDrawPreview({
   return (
     <article className="rounded-3xl bg-slate-950 p-8 text-white shadow-xl">
       <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">
-        Fair Draw Preview
+        Locked Draw Preview
       </p>
       <h2 className="mt-4 text-3xl font-semibold tracking-tight">
-        Equal random team assignment.
+        Saved team assignment snapshot.
       </h2>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-3">

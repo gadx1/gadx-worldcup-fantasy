@@ -1,6 +1,6 @@
 import type { Match, Team, Tournament } from '../types/domain'
 
-const eligibleMatchStatuses: Match['status'][] = ['scheduled', 'live', 'halftime']
+const drawPoolMatchStatuses: Match['status'][] = ['scheduled', 'live', 'halftime', 'fulltime']
 
 function isDateWithinTournamentWindow(dateIso: string, tournament: Tournament) {
   const date = new Date(dateIso).getTime()
@@ -13,10 +13,10 @@ function isDateWithinTournamentWindow(dateIso: string, tournament: Tournament) {
 function teamHasMatchInsideWindow(teamId: string, matches: Match[], tournament: Tournament) {
   return matches.some((match) => {
     const teamIsInMatch = match.homeTeamId === teamId || match.awayTeamId === teamId
-    const matchStatusIsEligible = eligibleMatchStatuses.includes(match.status)
+    const matchStatusBelongsToDrawPool = drawPoolMatchStatuses.includes(match.status)
     const matchIsInsideWindow = isDateWithinTournamentWindow(match.kickoffUtc, tournament)
 
-    return teamIsInMatch && matchStatusIsEligible && matchIsInsideWindow
+    return teamIsInMatch && matchStatusBelongsToDrawPool && matchIsInsideWindow
   })
 }
 
