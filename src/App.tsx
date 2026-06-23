@@ -5,6 +5,7 @@ import { EligibleTeamsPanel } from './components/EligibleTeamsPanel'
 import { FairDrawPreview } from './components/FairDrawPreview'
 import { FeatureSections } from './components/FeatureSections'
 import { LeaderboardPanel } from './components/LeaderboardPanel'
+import { MatchResultsPanel } from './components/MatchResultsPanel'
 import { MetricCard } from './components/MetricCard'
 import { adminSections, viewerSections } from './data/appSections'
 import { mockDraw, mockTeamAssignments } from './data/mockDraw'
@@ -73,6 +74,12 @@ function App() {
           teams={mockTeams}
           assignments={assignments}
           standings={standings}
+        />
+
+        <MatchResultsPanel
+          matches={mockMatches}
+          teams={mockTeams}
+          scoringRules={mockScoringRules}
         />
 
         <FeatureSections adminSections={adminSections} viewerSections={viewerSections} />

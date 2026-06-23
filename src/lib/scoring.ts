@@ -7,16 +7,43 @@ export interface TeamScore {
   totalPoints: number
 }
 
-function calculateTeamMatchScore(teamId: string, match: Match, scoringRules: ScoringRules) {
+export interface TeamMatchScore {
+  teamId: string
+  matchId: string
+  points: number
+  resultPoints: number
+  goalPoints: number
+  cleanSheetPoints: number
+}
+
+export function calculateTeamMatchScore(
+  teamId: string,
+  match: Match,
+  scoringRules: ScoringRules,
+): TeamMatchScore {
   const isHomeTeam = match.homeTeamId === teamId
   const isAwayTeam = match.awayTeamId === teamId
 
   if (!isHomeTeam && !isAwayTeam) {
-    return 0
+    return {
+      teamId,
+      matchId: match.id,
+      points: 0,
+      resultPoints: 0,
+      goalPoints: 0,
+      cleanSheetPoints: 0,
+    }
   }
 
   if (match.status !== 'fulltime') {
-    return 0
+    return {
+      teamId,
+      matchId: match.id,
+      points: 0,
+      resultPoints: 0,
+      goalPoints: 0,
+      cleanSheetPoints: 0,
+    }
   }
 
   const teamScore = isHomeTeam ? match.homeScore : match.awayScore
@@ -31,8 +58,16 @@ function calculateTeamMatchScore(teamId: string, match: Match, scoringRules: Sco
 
   const goalPoints = teamScore * scoringRules.goalPoints
   const cleanSheetPoints = opponentScore === 0 ? scoringRules.cleanSheetPoints : 0
+  const points = resultPoints + goalPoints + cleanSheetPoints
 
-  return resultPoints + goalPoints + cleanSheetPoints
+  return {
+    teamId,
+    matchId: match.id,
+    points,
+    resultPoints,
+    goalPoints,
+    cleanSheetPoints,
+  }
 }
 
 export function calculateTeamScores(
@@ -42,7 +77,7 @@ export function calculateTeamScores(
 ): TeamScore[] {
   return teamIds.map((teamId) => {
     const matchPoints = matches.reduce((total, match) => {
-      return total + calculateTeamMatchScore(teamId, match, scoringRules)
+      return total + calculateTeamMatchScore(teamId, match, scoringRules).points
     }, 0)
 
     return {
