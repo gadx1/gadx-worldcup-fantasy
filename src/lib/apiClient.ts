@@ -21,6 +21,29 @@ export type ApiDebugCountsResponse = {
   counts: ApiTableCount[]
 }
 
+export type ApiTournament = {
+  id: string
+  name: string
+  roundName: string
+  roundStartDate: string
+  roundEndDate: string
+  status: string
+  resultsMode: string
+  createdByUserId: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type ApiTournamentsResponse = {
+  ok: boolean
+  tournaments: ApiTournament[]
+}
+
+export type ApiTournamentResponse = {
+  ok: boolean
+  tournament: ApiTournament
+}
+
 async function apiGet<TResponse>(path: string): Promise<TResponse> {
   const response = await fetch(`${API_BASE_URL}${path}`)
 
@@ -37,4 +60,12 @@ export function fetchApiHealth() {
 
 export function fetchDebugCounts() {
   return apiGet<ApiDebugCountsResponse>('/api/debug/counts')
+}
+
+export function fetchTournaments() {
+  return apiGet<ApiTournamentsResponse>('/api/tournaments')
+}
+
+export function fetchTournamentById(tournamentId: string) {
+  return apiGet<ApiTournamentResponse>(`/api/tournaments/${tournamentId}`)
 }
