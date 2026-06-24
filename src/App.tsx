@@ -3,7 +3,7 @@ import { ApiStatusPanel } from './components/ApiStatusPanel'
 import { AppFooter } from './components/AppFooter'
 import { AppHeader } from './components/AppHeader'
 import { AppNavigation } from './components/AppNavigation'
-import { BackendDataSummaryPanel } from './components/BackendDataSummaryPanel'
+import { DataSourcePanel } from './components/DataSourcePanel'
 import { DrawControlPanel } from './components/DrawControlPanel'
 import { EligibleTeamsPanel } from './components/EligibleTeamsPanel'
 import { FeatureSections } from './components/FeatureSections'
@@ -251,7 +251,7 @@ function App() {
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <AppHeader milestone="Version 4.5" />
+        <AppHeader milestone="Version 4.6" />
         <AppNavigation />
 
         <section className="grid gap-4 md:grid-cols-4">
@@ -279,13 +279,13 @@ function App() {
 
         <ApiStatusPanel />
 
-        <BackendDataSummaryPanel tournamentId={activeTournamentId} />
+        <DataSourcePanel />
 
         <TournamentSetupPanel
           tournament={activeTournament}
           isLocked={isDrawLocked}
           isReadOnly={false}
-          statusLabel={isBackendDataReady ? 'Backend Write' : undefined}
+          statusLabel={undefined}
           readOnlyReason={undefined}
           onUpdateTournament={handleUpdateTournament}
           onResetTournament={handleResetTournament}
@@ -295,7 +295,7 @@ function App() {
           players={tournamentPlayers}
           isLocked={isDrawLocked}
           isReadOnly={false}
-          statusLabel={isBackendDataReady ? 'Backend Write' : undefined}
+          statusLabel={undefined}
           readOnlyReason={undefined}
           onUpdatePlayer={handleUpdatePlayer}
         />
@@ -342,7 +342,7 @@ function App() {
           matches={matches}
           teams={teams}
           isReadOnly={false}
-          statusLabel={isBackendDataReady ? 'Backend Write' : undefined}
+          statusLabel={undefined}
           readOnlyReason={undefined}
           onUpdateMatch={handleUpdateMatch}
           onResetMatches={handleResetMatches}

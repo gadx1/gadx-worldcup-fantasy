@@ -106,7 +106,7 @@ export function DrawControlPanel({
             onClick={onResetLockedDraw}
             type="button"
           >
-            Reset Local Draw
+            Reset Draw
           </button>
         </div>
       )}
