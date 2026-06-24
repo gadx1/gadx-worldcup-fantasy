@@ -320,8 +320,9 @@ async function updateMatch(env: Env, matchId: string, body: Record<string, unkno
   const status = typeof body.status === 'string' ? body.status.trim() : null
   const homeScore = typeof body.homeScore === 'number' ? body.homeScore : null
   const awayScore = typeof body.awayScore === 'number' ? body.awayScore : null
+  const kickoffUtc = typeof body.kickoffUtc === 'string' ? body.kickoffUtc.trim() : null
 
-  if (!status && homeScore === null && awayScore === null) {
+  if (!status && homeScore === null && awayScore === null && !kickoffUtc) {
     return badRequest('No valid match fields were provided.')
   }
 
@@ -332,11 +333,12 @@ async function updateMatch(env: Env, matchId: string, body: Record<string, unkno
       status = COALESCE(?, status),
       home_score = COALESCE(?, home_score),
       away_score = COALESCE(?, away_score),
+      kickoff_utc = COALESCE(?, kickoff_utc),
       updated_at = datetime('now')
     WHERE id = ?
     `,
   )
-    .bind(status, homeScore, awayScore, matchId)
+    .bind(status, homeScore, awayScore, kickoffUtc, matchId)
     .run()
 
   const match = await env.DB.prepare(
@@ -362,7 +364,9 @@ async function updateMatch(env: Env, matchId: string, body: Record<string, unkno
     INNER JOIN teams at ON at.id = m.away_team_id
     WHERE m.id = ?
     `,
-  ).bind(matchId).first()
+  )
+    .bind(matchId)
+    .first()
 
   if (!match) {
     return notFound()
@@ -603,7 +607,7 @@ export default {
           ok: true,
           service: 'gadx-worldcup-api',
           environment: env.ENVIRONMENT ?? 'unknown',
-          version: '0.3.0',
+          version: '0.4.0',
           database,
           timestamp: new Date().toISOString(),
         })
