@@ -46,6 +46,24 @@ export type ApiPlayer = {
   updatedAt: string
 }
 
+export type ApiMatch = {
+  id: string
+  tournamentId: string
+  roundName: string
+  homeTeamId: string
+  homeTeamName: string
+  homeTeamFlagEmoji: string
+  awayTeamId: string
+  awayTeamName: string
+  awayTeamFlagEmoji: string
+  kickoffUtc: string
+  status: string
+  homeScore: number
+  awayScore: number
+  createdAt: string
+  updatedAt: string
+}
+
 export type ApiTournamentsResponse = {
   ok: boolean
   tournaments: ApiTournament[]
@@ -59,6 +77,11 @@ export type ApiTournamentResponse = {
 export type ApiPlayersResponse = {
   ok: boolean
   players: ApiPlayer[]
+}
+
+export type ApiMatchesResponse = {
+  ok: boolean
+  matches: ApiMatch[]
 }
 
 async function apiGet<TResponse>(path: string): Promise<TResponse> {
@@ -89,4 +112,8 @@ export function fetchTournamentById(tournamentId: string) {
 
 export function fetchPlayersByTournamentId(tournamentId: string) {
   return apiGet<ApiPlayersResponse>(`/api/tournaments/${tournamentId}/players`)
+}
+
+export function fetchMatchesByTournamentId(tournamentId: string) {
+  return apiGet<ApiMatchesResponse>(`/api/tournaments/${tournamentId}/matches`)
 }

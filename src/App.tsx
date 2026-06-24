@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ApiStatusPanel } from './components/ApiStatusPanel'
 import { BackendTournamentPanel } from './components/BackendTournamentPanel'
 import { BackendPlayersPanel } from './components/BackendPlayersPanel'
+import { BackendMatchesPanel } from './components/BackendMatchesPanel'
 import { AppFooter } from './components/AppFooter'
 import { AppHeader } from './components/AppHeader'
 import { AppNavigation } from './components/AppNavigation'
@@ -173,7 +174,7 @@ function App() {
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <AppHeader milestone="Version 3.6" />
+        <AppHeader milestone="Version 3.7" />
         <AppNavigation />
 
         <section className="grid gap-4 md:grid-cols-4">
@@ -188,6 +189,8 @@ function App() {
         <BackendTournamentPanel />
 
         <BackendPlayersPanel tournamentId="tournament_dublin_friends" />
+
+        <BackendMatchesPanel tournamentId="tournament_dublin_friends" />
 
         <TournamentSetupPanel
           tournament={activeTournament}
