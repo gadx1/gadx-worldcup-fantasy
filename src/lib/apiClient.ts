@@ -34,6 +34,18 @@ export type ApiTournament = {
   updatedAt: string
 }
 
+export type ApiPlayer = {
+  id: string
+  tournamentId: string
+  firstName: string
+  lastName: string
+  displayName: string
+  avatarId: string
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
 export type ApiTournamentsResponse = {
   ok: boolean
   tournaments: ApiTournament[]
@@ -42,6 +54,11 @@ export type ApiTournamentsResponse = {
 export type ApiTournamentResponse = {
   ok: boolean
   tournament: ApiTournament
+}
+
+export type ApiPlayersResponse = {
+  ok: boolean
+  players: ApiPlayer[]
 }
 
 async function apiGet<TResponse>(path: string): Promise<TResponse> {
@@ -68,4 +85,8 @@ export function fetchTournaments() {
 
 export function fetchTournamentById(tournamentId: string) {
   return apiGet<ApiTournamentResponse>(`/api/tournaments/${tournamentId}`)
+}
+
+export function fetchPlayersByTournamentId(tournamentId: string) {
+  return apiGet<ApiPlayersResponse>(`/api/tournaments/${tournamentId}/players`)
 }
