@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ApiStatusPanel } from './components/ApiStatusPanel'
 import { AppFooter } from './components/AppFooter'
 import { AppHeader } from './components/AppHeader'
 import { AppNavigation } from './components/AppNavigation'
@@ -170,7 +171,7 @@ function App() {
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <AppHeader milestone="Milestone 2.10" />
+        <AppHeader milestone="Version 3.4" />
         <AppNavigation />
 
         <section className="grid gap-4 md:grid-cols-4">
@@ -179,6 +180,8 @@ function App() {
           <MetricCard label="Eligible Teams" value={drawReadiness.eligibleTeamCount} />
           <MetricCard label="Completed Matches" value={completedMatchCount} />
         </section>
+
+        <ApiStatusPanel />
 
         <TournamentSetupPanel
           tournament={activeTournament}
