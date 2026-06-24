@@ -64,6 +64,33 @@ export type ApiMatch = {
   updatedAt: string
 }
 
+export type ApiTeam = {
+  id: string
+  countryName: string
+  countryCode: string
+  fifaCode: string
+  flagEmoji: string
+  confederation: string
+  tournamentStatus: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type ApiScoringRules = {
+  id: string
+  tournamentId: string
+  winPoints: number
+  drawPoints: number
+  lossPoints: number
+  goalPoints: number
+  cleanSheetPoints: number
+  qualificationBonusPoints: number
+  groupWinnerBonusPoints: number
+  createdAt: string
+  updatedAt: string
+}
+
 export type ApiTournamentsResponse = {
   ok: boolean
   tournaments: ApiTournament[]
@@ -82,6 +109,16 @@ export type ApiPlayersResponse = {
 export type ApiMatchesResponse = {
   ok: boolean
   matches: ApiMatch[]
+}
+
+export type ApiTeamsResponse = {
+  ok: boolean
+  teams: ApiTeam[]
+}
+
+export type ApiScoringRulesResponse = {
+  ok: boolean
+  scoringRules: ApiScoringRules | null
 }
 
 async function apiGet<TResponse>(path: string): Promise<TResponse> {
@@ -116,4 +153,12 @@ export function fetchPlayersByTournamentId(tournamentId: string) {
 
 export function fetchMatchesByTournamentId(tournamentId: string) {
   return apiGet<ApiMatchesResponse>(`/api/tournaments/${tournamentId}/matches`)
+}
+
+export function fetchTeams() {
+  return apiGet<ApiTeamsResponse>('/api/teams')
+}
+
+export function fetchScoringRulesByTournamentId(tournamentId: string) {
+  return apiGet<ApiScoringRulesResponse>(`/api/tournaments/${tournamentId}/scoring-rules`)
 }
