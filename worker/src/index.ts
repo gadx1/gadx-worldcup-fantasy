@@ -3,21 +3,37 @@ export interface Env {
   ENVIRONMENT?: string
 }
 
-const corsHeaders = {
-  'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Origin': '*',
+const allowedOrigins = new Set([
+  'https://gadx-worldcup-fantasy.pages.dev',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+])
+
+function getCorsHeaders(request: Request) {
+  const origin = request.headers.get('Origin')
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+    'Vary': 'Origin',
+  }
+
+  if (origin && allowedOrigins.has(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin
+  }
+
+  return headers
 }
 
-function jsonResponse(data: unknown, status = 200) {
+function jsonResponse(request: Request, data: unknown, status = 200) {
   return Response.json(data, {
     status,
-    headers: corsHeaders,
+    headers: getCorsHeaders(request),
   })
 }
 
-function notFound() {
+function notFound(request: Request) {
   return jsonResponse(
+    request,
     {
       ok: false,
       error: 'Not found',
@@ -26,8 +42,9 @@ function notFound() {
   )
 }
 
-function badRequest(message: string) {
+function badRequest(request: Request, message: string) {
   return jsonResponse(
+    request,
     {
       ok: false,
       error: message,
@@ -123,7 +140,9 @@ async function getTournamentById(env: Env, tournamentId: string) {
     FROM tournaments
     WHERE id = ?
     `,
-  ).bind(tournamentId).first()
+  )
+    .bind(tournamentId)
+    .first()
 }
 
 async function getPlayersByTournamentId(env: Env, tournamentId: string) {
@@ -143,7 +162,9 @@ async function getPlayersByTournamentId(env: Env, tournamentId: string) {
     WHERE tournament_id = ?
     ORDER BY sort_order ASC
     `,
-  ).bind(tournamentId).all()
+  )
+    .bind(tournamentId)
+    .all()
 
   return result.results
 }
@@ -198,7 +219,9 @@ async function getMatchesByTournamentId(env: Env, tournamentId: string) {
     WHERE m.tournament_id = ?
     ORDER BY m.kickoff_utc ASC
     `,
-  ).bind(tournamentId).all()
+  )
+    .bind(tournamentId)
+    .all()
 
   return result.results
 }
@@ -221,10 +244,17 @@ async function getScoringRulesByTournamentId(env: Env, tournamentId: string) {
     FROM scoring_rules
     WHERE tournament_id = ?
     `,
-  ).bind(tournamentId).first()
+  )
+    .bind(tournamentId)
+    .first()
 }
 
-async function updateTournament(env: Env, tournamentId: string, body: Record<string, unknown>) {
+async function updateTournament(
+  request: Request,
+  env: Env,
+  tournamentId: string,
+  body: Record<string, unknown>,
+) {
   const name = typeof body.name === 'string' ? body.name.trim() : null
   const roundName = typeof body.roundName === 'string' ? body.roundName.trim() : null
   const roundStartDate =
@@ -233,7 +263,7 @@ async function updateTournament(env: Env, tournamentId: string, body: Record<str
   const resultsMode = typeof body.resultsMode === 'string' ? body.resultsMode.trim() : null
 
   if (!name && !roundName && !roundStartDate && !roundEndDate && !resultsMode) {
-    return badRequest('No valid tournament fields were provided.')
+    return badRequest(request, 'No valid tournament fields were provided.')
   }
 
   await env.DB.prepare(
@@ -255,23 +285,28 @@ async function updateTournament(env: Env, tournamentId: string, body: Record<str
   const tournament = await getTournamentById(env, tournamentId)
 
   if (!tournament) {
-    return notFound()
+    return notFound(request)
   }
 
-  return jsonResponse({
+  return jsonResponse(request, {
     ok: true,
     tournament,
   })
 }
 
-async function updatePlayer(env: Env, playerId: string, body: Record<string, unknown>) {
+async function updatePlayer(
+  request: Request,
+  env: Env,
+  playerId: string,
+  body: Record<string, unknown>,
+) {
   const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : null
   const lastName = typeof body.lastName === 'string' ? body.lastName.trim() : null
   const displayName = typeof body.displayName === 'string' ? body.displayName.trim() : null
   const avatarId = typeof body.avatarId === 'string' ? body.avatarId.trim() : null
 
   if (!firstName && !lastName && !displayName && !avatarId) {
-    return badRequest('No valid player fields were provided.')
+    return badRequest(request, 'No valid player fields were provided.')
   }
 
   await env.DB.prepare(
@@ -304,26 +339,33 @@ async function updatePlayer(env: Env, playerId: string, body: Record<string, unk
     FROM players
     WHERE id = ?
     `,
-  ).bind(playerId).first()
+  )
+    .bind(playerId)
+    .first()
 
   if (!player) {
-    return notFound()
+    return notFound(request)
   }
 
-  return jsonResponse({
+  return jsonResponse(request, {
     ok: true,
     player,
   })
 }
 
-async function updateMatch(env: Env, matchId: string, body: Record<string, unknown>) {
+async function updateMatch(
+  request: Request,
+  env: Env,
+  matchId: string,
+  body: Record<string, unknown>,
+) {
   const status = typeof body.status === 'string' ? body.status.trim() : null
   const homeScore = typeof body.homeScore === 'number' ? body.homeScore : null
   const awayScore = typeof body.awayScore === 'number' ? body.awayScore : null
   const kickoffUtc = typeof body.kickoffUtc === 'string' ? body.kickoffUtc.trim() : null
 
   if (!status && homeScore === null && awayScore === null && !kickoffUtc) {
-    return badRequest('No valid match fields were provided.')
+    return badRequest(request, 'No valid match fields were provided.')
   }
 
   await env.DB.prepare(
@@ -369,10 +411,10 @@ async function updateMatch(env: Env, matchId: string, body: Record<string, unkno
     .first()
 
   if (!match) {
-    return notFound()
+    return notFound(request)
   }
 
-  return jsonResponse({
+  return jsonResponse(request, {
     ok: true,
     match,
   })
@@ -448,17 +490,22 @@ async function getLockedDrawByTournamentId(env: Env, tournamentId: string) {
   }
 }
 
-async function saveLockedDraw(env: Env, tournamentId: string, body: Record<string, unknown>) {
+async function saveLockedDraw(
+  request: Request,
+  env: Env,
+  tournamentId: string,
+  body: Record<string, unknown>,
+) {
   const assignments = Array.isArray(body.assignments) ? body.assignments : null
   const createdByUserId =
     typeof body.createdByUserId === 'string' ? body.createdByUserId : 'user_admin'
 
   if (!assignments || assignments.length === 0) {
-    return badRequest('Draw assignments are required.')
+    return badRequest(request, 'Draw assignments are required.')
   }
 
   if (!assignments.every(isDrawAssignmentInput)) {
-    return badRequest('Draw assignments must include playerId and teamId.')
+    return badRequest(request, 'Draw assignments must include playerId and teamId.')
   }
 
   const drawId = `draw_${tournamentId}_${Date.now()}`
@@ -539,13 +586,13 @@ async function saveLockedDraw(env: Env, tournamentId: string, body: Record<strin
 
   const lockedDraw = await getLockedDrawByTournamentId(env, tournamentId)
 
-  return jsonResponse({
+  return jsonResponse(request, {
     ok: true,
     ...lockedDraw,
   })
 }
 
-async function deleteLockedDraw(env: Env, tournamentId: string) {
+async function deleteLockedDraw(request: Request, env: Env, tournamentId: string) {
   const existingDraws = await env.DB.prepare(
     `
     SELECT id
@@ -580,7 +627,7 @@ async function deleteLockedDraw(env: Env, tournamentId: string) {
 
   await env.DB.batch(statements)
 
-  return jsonResponse({
+  return jsonResponse(request, {
     ok: true,
     draw: null,
     assignments: [],
@@ -595,7 +642,7 @@ export default {
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         status: 204,
-        headers: corsHeaders,
+        headers: getCorsHeaders(request),
       })
     }
 
@@ -603,11 +650,11 @@ export default {
       if (request.method === 'GET' && pathname === '/api/health') {
         const database = await getDatabaseHealth(env)
 
-        return jsonResponse({
+        return jsonResponse(request, {
           ok: true,
           service: 'gadx-worldcup-api',
           environment: env.ENVIRONMENT ?? 'unknown',
-          version: '0.4.0',
+          version: '0.5.0',
           database,
           timestamp: new Date().toISOString(),
         })
@@ -616,7 +663,7 @@ export default {
       if (request.method === 'GET' && pathname === '/api/debug/counts') {
         const counts = await getTableCounts(env)
 
-        return jsonResponse({
+        return jsonResponse(request, {
           ok: true,
           counts,
         })
@@ -625,7 +672,7 @@ export default {
       if (request.method === 'GET' && pathname === '/api/tournaments') {
         const tournaments = await getTournaments(env)
 
-        return jsonResponse({
+        return jsonResponse(request, {
           ok: true,
           tournaments,
         })
@@ -634,7 +681,7 @@ export default {
       if (request.method === 'GET' && pathname === '/api/teams') {
         const teams = await getTeams(env)
 
-        return jsonResponse({
+        return jsonResponse(request, {
           ok: true,
           teams,
         })
@@ -646,10 +693,10 @@ export default {
         const tournament = await getTournamentById(env, tournamentMatch[1])
 
         if (!tournament) {
-          return notFound()
+          return notFound(request)
         }
 
-        return jsonResponse({
+        return jsonResponse(request, {
           ok: true,
           tournament,
         })
@@ -659,10 +706,10 @@ export default {
         const body = await parseJsonBody(request)
 
         if (!body) {
-          return badRequest('Invalid JSON body.')
+          return badRequest(request, 'Invalid JSON body.')
         }
 
-        return updateTournament(env, tournamentMatch[1], body)
+        return updateTournament(request, env, tournamentMatch[1], body)
       }
 
       const playersMatch = pathname.match(/^\/api\/tournaments\/([^/]+)\/players$/)
@@ -670,7 +717,7 @@ export default {
       if (request.method === 'GET' && playersMatch) {
         const players = await getPlayersByTournamentId(env, playersMatch[1])
 
-        return jsonResponse({
+        return jsonResponse(request, {
           ok: true,
           players,
         })
@@ -681,7 +728,7 @@ export default {
       if (request.method === 'GET' && matchesMatch) {
         const matches = await getMatchesByTournamentId(env, matchesMatch[1])
 
-        return jsonResponse({
+        return jsonResponse(request, {
           ok: true,
           matches,
         })
@@ -692,7 +739,7 @@ export default {
       if (request.method === 'GET' && scoringRulesMatch) {
         const scoringRules = await getScoringRulesByTournamentId(env, scoringRulesMatch[1])
 
-        return jsonResponse({
+        return jsonResponse(request, {
           ok: true,
           scoringRules,
         })
@@ -703,7 +750,7 @@ export default {
       if (request.method === 'GET' && lockedDrawMatch) {
         const lockedDraw = await getLockedDrawByTournamentId(env, lockedDrawMatch[1])
 
-        return jsonResponse({
+        return jsonResponse(request, {
           ok: true,
           ...lockedDraw,
         })
@@ -713,14 +760,14 @@ export default {
         const body = await parseJsonBody(request)
 
         if (!body) {
-          return badRequest('Invalid JSON body.')
+          return badRequest(request, 'Invalid JSON body.')
         }
 
-        return saveLockedDraw(env, lockedDrawMatch[1], body)
+        return saveLockedDraw(request, env, lockedDrawMatch[1], body)
       }
 
       if (request.method === 'DELETE' && lockedDrawMatch) {
-        return deleteLockedDraw(env, lockedDrawMatch[1])
+        return deleteLockedDraw(request, env, lockedDrawMatch[1])
       }
 
       const playerMatch = pathname.match(/^\/api\/players\/([^/]+)$/)
@@ -729,10 +776,10 @@ export default {
         const body = await parseJsonBody(request)
 
         if (!body) {
-          return badRequest('Invalid JSON body.')
+          return badRequest(request, 'Invalid JSON body.')
         }
 
-        return updatePlayer(env, playerMatch[1], body)
+        return updatePlayer(request, env, playerMatch[1], body)
       }
 
       const matchMatch = pathname.match(/^\/api\/matches\/([^/]+)$/)
@@ -741,15 +788,16 @@ export default {
         const body = await parseJsonBody(request)
 
         if (!body) {
-          return badRequest('Invalid JSON body.')
+          return badRequest(request, 'Invalid JSON body.')
         }
 
-        return updateMatch(env, matchMatch[1], body)
+        return updateMatch(request, env, matchMatch[1], body)
       }
 
-      return notFound()
+      return notFound(request)
     } catch (error) {
       return jsonResponse(
+        request,
         {
           ok: false,
           error: error instanceof Error ? error.message : 'Unknown server error',
