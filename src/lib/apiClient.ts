@@ -106,9 +106,19 @@ export type ApiPlayersResponse = {
   players: ApiPlayer[]
 }
 
+export type ApiPlayerResponse = {
+  ok: boolean
+  player: ApiPlayer
+}
+
 export type ApiMatchesResponse = {
   ok: boolean
   matches: ApiMatch[]
+}
+
+export type ApiMatchResponse = {
+  ok: boolean
+  match: ApiMatch
 }
 
 export type ApiTeamsResponse = {
@@ -121,8 +131,45 @@ export type ApiScoringRulesResponse = {
   scoringRules: ApiScoringRules | null
 }
 
+export type UpdateTournamentPayload = {
+  name?: string
+  roundName?: string
+  roundStartDate?: string
+  roundEndDate?: string
+  resultsMode?: string
+}
+
+export type UpdatePlayerPayload = {
+  firstName?: string
+  lastName?: string
+  displayName?: string
+  avatarId?: string
+}
+
+export type UpdateMatchPayload = {
+  status?: string
+  homeScore?: number
+  awayScore?: number
+}
+
 async function apiGet<TResponse>(path: string): Promise<TResponse> {
   const response = await fetch(`${API_BASE_URL}${path}`)
+
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status} ${response.statusText}`)
+  }
+
+  return response.json() as Promise<TResponse>
+}
+
+async function apiPatch<TResponse>(path: string, body: Record<string, unknown>): Promise<TResponse> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    body: JSON.stringify(body),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    method: 'PATCH',
+  })
 
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status} ${response.statusText}`)
@@ -161,4 +208,16 @@ export function fetchTeams() {
 
 export function fetchScoringRulesByTournamentId(tournamentId: string) {
   return apiGet<ApiScoringRulesResponse>(`/api/tournaments/${tournamentId}/scoring-rules`)
+}
+
+export function updateTournament(tournamentId: string, payload: UpdateTournamentPayload) {
+  return apiPatch<ApiTournamentResponse>(`/api/tournaments/${tournamentId}`, payload)
+}
+
+export function updatePlayer(playerId: string, payload: UpdatePlayerPayload) {
+  return apiPatch<ApiPlayerResponse>(`/api/players/${playerId}`, payload)
+}
+
+export function updateMatch(matchId: string, payload: UpdateMatchPayload) {
+  return apiPatch<ApiMatchResponse>(`/api/matches/${matchId}`, payload)
 }

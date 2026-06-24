@@ -24,6 +24,7 @@ import { useLocalStorageState } from './hooks/useLocalStorageState'
 import { getDrawReadiness, runFairDraw } from './lib/draw'
 import { getEligibleTeams, getIneligibleTeams } from './lib/eligibility'
 import { calculateStandings } from './lib/scoring'
+import { updateMatch, updatePlayer, updateTournament } from './lib/apiClient'
 import type { Match, Player, TeamAssignment, Tournament } from './types/domain'
 
 const activeTournamentId = 'tournament_dublin_friends'
@@ -113,8 +114,21 @@ function App() {
     setDraftAssignments([])
   }
 
-  function handleUpdateTournament(updates: Partial<Tournament>) {
-    if (isDrawLocked || isBackendDataReady) {
+  async function handleUpdateTournament(updates: Partial<Tournament>) {
+    if (isDrawLocked) {
+      return
+    }
+
+    if (isBackendDataReady) {
+      await updateTournament(activeTournament.id, {
+        name: updates.name,
+        roundName: updates.roundName,
+        roundStartDate: updates.roundStartDate,
+        roundEndDate: updates.roundEndDate,
+        resultsMode: updates.resultsMode,
+      })
+      await backendGameData.reload()
+      setDraftAssignments([])
       return
     }
 
@@ -136,8 +150,20 @@ function App() {
     setDraftAssignments([])
   }
 
-  function handleUpdatePlayer(playerId: string, updates: Partial<Player>) {
-    if (isDrawLocked || isBackendDataReady) {
+  async function handleUpdatePlayer(playerId: string, updates: Partial<Player>) {
+    if (isDrawLocked) {
+      return
+    }
+
+    if (isBackendDataReady) {
+      await updatePlayer(playerId, {
+        firstName: updates.firstName,
+        lastName: updates.lastName,
+        displayName: updates.displayName,
+        avatarId: updates.avatarId,
+      })
+      await backendGameData.reload()
+      setDraftAssignments([])
       return
     }
 
@@ -164,8 +190,14 @@ function App() {
     setDraftAssignments([])
   }
 
-  function handleUpdateMatch(matchId: string, updates: Partial<Match>) {
+  async function handleUpdateMatch(matchId: string, updates: Partial<Match>) {
     if (isBackendDataReady) {
+      await updateMatch(matchId, {
+        status: updates.status,
+        homeScore: updates.homeScore,
+        awayScore: updates.awayScore,
+      })
+      await backendGameData.reload()
       return
     }
 
@@ -192,7 +224,7 @@ function App() {
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <AppHeader milestone="Version 4.1" />
+        <AppHeader milestone="Version 4.3" />
         <AppNavigation />
 
         <section className="grid gap-4 md:grid-cols-4">
@@ -217,13 +249,9 @@ function App() {
         <TournamentSetupPanel
           tournament={activeTournament}
           isLocked={isDrawLocked}
-          isReadOnly={isBackendDataReady}
-          statusLabel={isBackendDataReady ? 'Backend Read' : undefined}
-          readOnlyReason={
-            isBackendDataReady
-              ? 'This tournament is now being read from D1 through the Worker API. Editing will be re-enabled after backend write endpoints are added.'
-              : undefined
-          }
+          isReadOnly={false}
+          statusLabel={isBackendDataReady ? 'Backend Write' : undefined}
+          readOnlyReason={undefined}
           onUpdateTournament={handleUpdateTournament}
           onResetTournament={handleResetTournament}
         />
@@ -231,13 +259,9 @@ function App() {
         <PlayerSetupPanel
           players={tournamentPlayers}
           isLocked={isDrawLocked}
-          isReadOnly={isBackendDataReady}
-          statusLabel={isBackendDataReady ? 'Backend Read' : undefined}
-          readOnlyReason={
-            isBackendDataReady
-              ? 'Players are now being read from D1 through the Worker API. Editing will be re-enabled after backend write endpoints are added.'
-              : undefined
-          }
+          isReadOnly={false}
+          statusLabel={isBackendDataReady ? 'Backend Write' : undefined}
+          readOnlyReason={undefined}
           onUpdatePlayer={handleUpdatePlayer}
         />
 
@@ -282,13 +306,9 @@ function App() {
         <MatchAdminPanel
           matches={matches}
           teams={teams}
-          isReadOnly={isBackendDataReady}
-          statusLabel={isBackendDataReady ? 'Backend Read' : undefined}
-          readOnlyReason={
-            isBackendDataReady
-              ? 'Matches are now being read from D1 through the Worker API. Manual editing will be re-enabled after backend write endpoints are added.'
-              : undefined
-          }
+          isReadOnly={false}
+          statusLabel={isBackendDataReady ? 'Backend Write' : undefined}
+          readOnlyReason={undefined}
           onUpdateMatch={handleUpdateMatch}
           onResetMatches={handleResetMatches}
         />

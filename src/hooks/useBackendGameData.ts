@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   fetchMatchesByTournamentId,
   fetchPlayersByTournamentId,
@@ -22,6 +22,7 @@ type UseBackendGameDataResult = {
   data: BackendGameData
   errorMessage: string | null
   isBackendDataReady: boolean
+  reload: () => Promise<void>
   status: BackendGameDataStatus
 }
 
@@ -143,10 +144,51 @@ export function useBackendGameData(tournamentId: string): UseBackendGameDataResu
   })
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
+  const loadBackendGameData = useCallback(async () => {
+    try {
+      const [
+        tournamentResponse,
+        playersResponse,
+        matchesResponse,
+        teamsResponse,
+        scoringRulesResponse,
+      ] = await Promise.all([
+        fetchTournamentById(tournamentId),
+        fetchPlayersByTournamentId(tournamentId),
+        fetchMatchesByTournamentId(tournamentId),
+        fetchTeams(),
+        fetchScoringRulesByTournamentId(tournamentId),
+      ])
+
+      setData({
+        tournament: mapApiTournament(tournamentResponse.tournament),
+        players: playersResponse.players.map(mapApiPlayer),
+        matches: matchesResponse.matches.map(mapApiMatch),
+        teams: teamsResponse.teams.map(mapApiTeam),
+        scoringRules: scoringRulesResponse.scoringRules
+          ? mapApiScoringRules(scoringRulesResponse.scoringRules)
+          : null,
+      })
+
+      setStatus('ready')
+      setErrorMessage(null)
+    } catch (error) {
+      setData({
+        matches: [],
+        players: [],
+        scoringRules: null,
+        teams: [],
+        tournament: null,
+      })
+      setStatus('error')
+      setErrorMessage(error instanceof Error ? error.message : 'Unknown API error')
+    }
+  }, [tournamentId])
+
   useEffect(() => {
     let isMounted = true
 
-    async function loadBackendGameData() {
+    async function loadWhenMounted() {
       try {
         const [
           tournamentResponse,
@@ -195,7 +237,7 @@ export function useBackendGameData(tournamentId: string): UseBackendGameDataResu
       }
     }
 
-    loadBackendGameData()
+    loadWhenMounted()
 
     return () => {
       isMounted = false
@@ -212,6 +254,7 @@ export function useBackendGameData(tournamentId: string): UseBackendGameDataResu
       data.matches.length > 0 &&
       data.teams.length > 0 &&
       data.scoringRules !== null,
+    reload: loadBackendGameData,
     status,
   }
 }
