@@ -5,7 +5,7 @@ export interface Env {
 
 const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Allow-Methods': 'GET, PATCH, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
   'Access-Control-Allow-Origin': '*',
 }
 
@@ -374,6 +374,215 @@ async function updateMatch(env: Env, matchId: string, body: Record<string, unkno
   })
 }
 
+type DrawAssignmentInput = {
+  playerId: string
+  teamId: string
+}
+
+function isDrawAssignmentInput(value: unknown): value is DrawAssignmentInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+
+  const assignment = value as Record<string, unknown>
+
+  return typeof assignment.playerId === 'string' && typeof assignment.teamId === 'string'
+}
+
+async function getLockedDrawByTournamentId(env: Env, tournamentId: string) {
+  const draw = await env.DB.prepare(
+    `
+    SELECT
+      id,
+      tournament_id AS tournamentId,
+      status,
+      created_by_user_id AS createdByUserId,
+      created_at AS createdAt,
+      updated_at AS updatedAt
+    FROM draws
+    WHERE tournament_id = ?
+      AND status = 'locked'
+    ORDER BY created_at DESC
+    LIMIT 1
+    `,
+  )
+    .bind(tournamentId)
+    .first<{ id: string }>()
+
+  if (!draw) {
+    return {
+      draw: null,
+      assignments: [],
+    }
+  }
+
+  const assignmentsResult = await env.DB.prepare(
+    `
+    SELECT
+      ta.id,
+      ta.draw_id AS drawId,
+      ta.tournament_id AS tournamentId,
+      ta.player_id AS playerId,
+      p.display_name AS playerDisplayName,
+      ta.team_id AS teamId,
+      t.country_name AS teamName,
+      t.flag_emoji AS teamFlagEmoji,
+      ta.created_at AS createdAt
+    FROM team_assignments ta
+    INNER JOIN players p ON p.id = ta.player_id
+    INNER JOIN teams t ON t.id = ta.team_id
+    WHERE ta.draw_id = ?
+    ORDER BY p.sort_order ASC, t.country_name ASC
+    `,
+  )
+    .bind(draw.id)
+    .all()
+
+  return {
+    draw,
+    assignments: assignmentsResult.results,
+  }
+}
+
+async function saveLockedDraw(env: Env, tournamentId: string, body: Record<string, unknown>) {
+  const assignments = Array.isArray(body.assignments) ? body.assignments : null
+  const createdByUserId =
+    typeof body.createdByUserId === 'string' ? body.createdByUserId : 'user_admin'
+
+  if (!assignments || assignments.length === 0) {
+    return badRequest('Draw assignments are required.')
+  }
+
+  if (!assignments.every(isDrawAssignmentInput)) {
+    return badRequest('Draw assignments must include playerId and teamId.')
+  }
+
+  const drawId = `draw_${tournamentId}_${Date.now()}`
+
+  const existingDraws = await env.DB.prepare(
+    `
+    SELECT id
+    FROM draws
+    WHERE tournament_id = ?
+    `,
+  )
+    .bind(tournamentId)
+    .all<{ id: string }>()
+
+  const statements = []
+
+  for (const existingDraw of existingDraws.results) {
+    statements.push(
+      env.DB.prepare(
+        `
+        DELETE FROM team_assignments
+        WHERE draw_id = ?
+        `,
+      ).bind(existingDraw.id),
+    )
+  }
+
+  statements.push(
+    env.DB.prepare(
+      `
+      DELETE FROM draws
+      WHERE tournament_id = ?
+      `,
+    ).bind(tournamentId),
+  )
+
+  statements.push(
+    env.DB.prepare(
+      `
+      INSERT INTO draws (
+        id,
+        tournament_id,
+        status,
+        created_by_user_id,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, 'locked', ?, datetime('now'), datetime('now'))
+      `,
+    ).bind(drawId, tournamentId, createdByUserId),
+  )
+
+  assignments.forEach((assignment, index) => {
+    statements.push(
+      env.DB.prepare(
+        `
+        INSERT INTO team_assignments (
+          id,
+          draw_id,
+          tournament_id,
+          player_id,
+          team_id,
+          created_at
+        )
+        VALUES (?, ?, ?, ?, ?, datetime('now'))
+        `,
+      ).bind(
+        `assignment_${drawId}_${index + 1}`,
+        drawId,
+        tournamentId,
+        assignment.playerId,
+        assignment.teamId,
+      ),
+    )
+  })
+
+  await env.DB.batch(statements)
+
+  const lockedDraw = await getLockedDrawByTournamentId(env, tournamentId)
+
+  return jsonResponse({
+    ok: true,
+    ...lockedDraw,
+  })
+}
+
+async function deleteLockedDraw(env: Env, tournamentId: string) {
+  const existingDraws = await env.DB.prepare(
+    `
+    SELECT id
+    FROM draws
+    WHERE tournament_id = ?
+    `,
+  )
+    .bind(tournamentId)
+    .all<{ id: string }>()
+
+  const statements = []
+
+  for (const existingDraw of existingDraws.results) {
+    statements.push(
+      env.DB.prepare(
+        `
+        DELETE FROM team_assignments
+        WHERE draw_id = ?
+        `,
+      ).bind(existingDraw.id),
+    )
+  }
+
+  statements.push(
+    env.DB.prepare(
+      `
+      DELETE FROM draws
+      WHERE tournament_id = ?
+      `,
+    ).bind(tournamentId),
+  )
+
+  await env.DB.batch(statements)
+
+  return jsonResponse({
+    ok: true,
+    draw: null,
+    assignments: [],
+  })
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
@@ -394,7 +603,7 @@ export default {
           ok: true,
           service: 'gadx-worldcup-api',
           environment: env.ENVIRONMENT ?? 'unknown',
-          version: '0.2.0',
+          version: '0.3.0',
           database,
           timestamp: new Date().toISOString(),
         })
@@ -483,6 +692,31 @@ export default {
           ok: true,
           scoringRules,
         })
+      }
+
+      const lockedDrawMatch = pathname.match(/^\/api\/tournaments\/([^/]+)\/draw$/)
+
+      if (request.method === 'GET' && lockedDrawMatch) {
+        const lockedDraw = await getLockedDrawByTournamentId(env, lockedDrawMatch[1])
+
+        return jsonResponse({
+          ok: true,
+          ...lockedDraw,
+        })
+      }
+
+      if (request.method === 'POST' && lockedDrawMatch) {
+        const body = await parseJsonBody(request)
+
+        if (!body) {
+          return badRequest('Invalid JSON body.')
+        }
+
+        return saveLockedDraw(env, lockedDrawMatch[1], body)
+      }
+
+      if (request.method === 'DELETE' && lockedDrawMatch) {
+        return deleteLockedDraw(env, lockedDrawMatch[1])
       }
 
       const playerMatch = pathname.match(/^\/api\/players\/([^/]+)$/)
