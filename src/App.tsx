@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { ApiStatusPanel } from './components/ApiStatusPanel'
-import { BackendDataSummaryPanel } from './components/BackendDataSummaryPanel'
 import { AppFooter } from './components/AppFooter'
 import { AppHeader } from './components/AppHeader'
 import { AppNavigation } from './components/AppNavigation'
+import { BackendDataSummaryPanel } from './components/BackendDataSummaryPanel'
 import { DrawControlPanel } from './components/DrawControlPanel'
 import { EligibleTeamsPanel } from './components/EligibleTeamsPanel'
 import { FeatureSections } from './components/FeatureSections'
@@ -19,11 +19,14 @@ import { mockPlayers } from './data/mockPlayers'
 import { mockScoringRules } from './data/mockScoringRules'
 import { mockTeams } from './data/mockTeams'
 import { mockTournaments } from './data/mockTournaments'
+import { useBackendTournament } from './hooks/useBackendTournament'
 import { useLocalStorageState } from './hooks/useLocalStorageState'
 import { getDrawReadiness, runFairDraw } from './lib/draw'
 import { getEligibleTeams, getIneligibleTeams } from './lib/eligibility'
 import { calculateStandings } from './lib/scoring'
 import type { Match, Player, TeamAssignment, Tournament } from './types/domain'
+
+const activeTournamentId = 'tournament_dublin_friends'
 
 const localStorageKeys = {
   lockedAssignments: 'gadx-worldcup-draw:locked-assignments',
@@ -34,9 +37,13 @@ const localStorageKeys = {
 
 function App() {
   const defaultTournament = mockTournaments[0]
+  const backendTournament = useBackendTournament(activeTournamentId)
 
-  const [activeTournament, setActiveTournament, resetTournament] =
+  const [localTournament, setLocalTournament, resetLocalTournament] =
     useLocalStorageState<Tournament>(localStorageKeys.tournament, defaultTournament)
+
+  const activeTournament = backendTournament.tournament ?? localTournament
+  const isBackendTournament = backendTournament.isBackendTournament
 
   const [players, setPlayers, resetPlayers] = useLocalStorageState<Player[]>(
     localStorageKeys.players,
@@ -102,11 +109,11 @@ function App() {
   }
 
   function handleUpdateTournament(updates: Partial<Tournament>) {
-    if (isDrawLocked) {
+    if (isDrawLocked || isBackendTournament) {
       return
     }
 
-    setActiveTournament((currentTournament) => ({
+    setLocalTournament((currentTournament) => ({
       ...currentTournament,
       ...updates,
       updatedAt: new Date().toISOString(),
@@ -116,11 +123,11 @@ function App() {
   }
 
   function handleResetTournament() {
-    if (isDrawLocked) {
+    if (isDrawLocked || isBackendTournament) {
       return
     }
 
-    resetTournament()
+    resetLocalTournament()
     setDraftAssignments([])
   }
 
@@ -172,7 +179,7 @@ function App() {
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <AppHeader milestone="Version 3.9" />
+        <AppHeader milestone="Version 4.0" />
         <AppNavigation />
 
         <section className="grid gap-4 md:grid-cols-4">
@@ -182,12 +189,28 @@ function App() {
           <MetricCard label="Completed Matches" value={completedMatchCount} />
         </section>
 
+        {backendTournament.status === 'error' && (
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
+            Backend tournament is not available yet, so the app is temporarily using the local
+            fallback tournament. Start the Worker with <code>npm run worker:dev</code>. Error:{' '}
+            {backendTournament.errorMessage}
+          </div>
+        )}
+
         <ApiStatusPanel />
-        <BackendDataSummaryPanel tournamentId="tournament_dublin_friends" />
+
+        <BackendDataSummaryPanel tournamentId={activeTournamentId} />
 
         <TournamentSetupPanel
           tournament={activeTournament}
           isLocked={isDrawLocked}
+          isReadOnly={isBackendTournament}
+          statusLabel={isBackendTournament ? 'Backend Read' : undefined}
+          readOnlyReason={
+            isBackendTournament
+              ? 'This tournament is now being read from D1 through the Worker API. Editing will be re-enabled after backend write endpoints are added.'
+              : undefined
+          }
           onUpdateTournament={handleUpdateTournament}
           onResetTournament={handleResetTournament}
         />
