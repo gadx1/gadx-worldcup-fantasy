@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "worker:dev": "wrangler dev --config worker/wrangler.toml",
     "worker:typecheck": "tsc -p worker/tsconfig.json --noEmit",
-    "worker:deploy": "wrangler deploy --config worker/wrangler.toml"
+    "worker:deploy": "wrangler deploy --config worker/wrangler.toml",
+    "d1:migrate:local": "wrangler d1 migrations apply gadx_worldcup_draw --local --config worker/wrangler.toml",
+    "d1:migrate:remote": "wrangler d1 migrations apply gadx_worldcup_draw --remote --config worker/wrangler.toml"
   },
   "dependencies": {
     "react": "^19.2.7",

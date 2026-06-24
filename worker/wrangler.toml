@@ -3,9 +3,10 @@ main = "src/index.ts"
 compatibility_date = "2026-06-23"
 
 [vars]
-ENVIRONMENT = "local"
+ENVIRONMENT = "production"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "gadx_worldcup_draw"
 database_id = "b37d2284-9007-4bfd-baa8-63e2016e9def"
+migrations_dir = "migrations"
