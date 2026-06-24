@@ -1,43 +1,26 @@
-interface Env {
+export interface Env {
   DB: D1Database
   ENVIRONMENT?: string
 }
 
-type DbTeamRow = {
-  id: string
-  countryName: string
-  countryCode: string
-  fifaCode: string
-  flagEmoji: string
-  confederation: string
-  tournamentStatus: string
-  isActive: number
-  createdAt: string
-  updatedAt: string
-}
-
 const corsHeaders = {
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'GET, PATCH, OPTIONS',
   'Access-Control-Allow-Origin': '*',
 }
 
 function jsonResponse(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data, null, 2), {
-    headers: {
-      ...corsHeaders,
-      'Content-Type': 'application/json; charset=utf-8',
-    },
+  return Response.json(data, {
     status,
+    headers: corsHeaders,
   })
 }
 
-function notFound(pathname: string) {
+function notFound() {
   return jsonResponse(
     {
       ok: false,
-      error: 'Not Found',
-      pathname,
+      error: 'Not found',
     },
     404,
   )
@@ -47,11 +30,24 @@ function badRequest(message: string) {
   return jsonResponse(
     {
       ok: false,
-      error: 'Bad Request',
-      message,
+      error: message,
     },
     400,
   )
+}
+
+async function parseJsonBody(request: Request): Promise<Record<string, unknown> | null> {
+  try {
+    const body = await request.json()
+
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return null
+    }
+
+    return body as Record<string, unknown>
+  } catch {
+    return null
+  }
 }
 
 async function getDatabaseHealth(env: Env) {
@@ -103,7 +99,7 @@ async function getTournaments(env: Env) {
       created_at AS createdAt,
       updated_at AS updatedAt
     FROM tournaments
-    ORDER BY created_at DESC;
+    ORDER BY created_at DESC
     `,
   ).all()
 
@@ -125,11 +121,9 @@ async function getTournamentById(env: Env, tournamentId: string) {
       created_at AS createdAt,
       updated_at AS updatedAt
     FROM tournaments
-    WHERE id = ?;
+    WHERE id = ?
     `,
-  )
-    .bind(tournamentId)
-    .first()
+  ).bind(tournamentId).first()
 }
 
 async function getPlayersByTournamentId(env: Env, tournamentId: string) {
@@ -147,28 +141,11 @@ async function getPlayersByTournamentId(env: Env, tournamentId: string) {
       updated_at AS updatedAt
     FROM players
     WHERE tournament_id = ?
-    ORDER BY sort_order ASC;
+    ORDER BY sort_order ASC
     `,
-  )
-    .bind(tournamentId)
-    .all()
+  ).bind(tournamentId).all()
 
   return result.results
-}
-
-function mapTeamRow(row: DbTeamRow) {
-  return {
-    id: row.id,
-    countryName: row.countryName,
-    countryCode: row.countryCode,
-    fifaCode: row.fifaCode,
-    flagEmoji: row.flagEmoji,
-    confederation: row.confederation,
-    tournamentStatus: row.tournamentStatus,
-    isActive: row.isActive === 1,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  }
 }
 
 async function getTeams(env: Env) {
@@ -186,43 +163,42 @@ async function getTeams(env: Env) {
       created_at AS createdAt,
       updated_at AS updatedAt
     FROM teams
-    ORDER BY country_name ASC;
+    ORDER BY country_name ASC
     `,
-  ).all<DbTeamRow>()
+  ).all()
 
-  return result.results.map(mapTeamRow)
+  return result.results.map((team) => ({
+    ...team,
+    isActive: team.isActive === 1,
+  }))
 }
 
 async function getMatchesByTournamentId(env: Env, tournamentId: string) {
   const result = await env.DB.prepare(
     `
     SELECT
-      matches.id,
-      matches.tournament_id AS tournamentId,
-      matches.round_name AS roundName,
-      matches.home_team_id AS homeTeamId,
-      home_team.country_name AS homeTeamName,
-      home_team.flag_emoji AS homeTeamFlagEmoji,
-      matches.away_team_id AS awayTeamId,
-      away_team.country_name AS awayTeamName,
-      away_team.flag_emoji AS awayTeamFlagEmoji,
-      matches.kickoff_utc AS kickoffUtc,
-      matches.status,
-      matches.home_score AS homeScore,
-      matches.away_score AS awayScore,
-      matches.created_at AS createdAt,
-      matches.updated_at AS updatedAt
-    FROM matches
-    INNER JOIN teams AS home_team
-      ON home_team.id = matches.home_team_id
-    INNER JOIN teams AS away_team
-      ON away_team.id = matches.away_team_id
-    WHERE matches.tournament_id = ?
-    ORDER BY matches.kickoff_utc ASC;
+      m.id,
+      m.tournament_id AS tournamentId,
+      m.round_name AS roundName,
+      m.home_team_id AS homeTeamId,
+      ht.country_name AS homeTeamName,
+      ht.flag_emoji AS homeTeamFlagEmoji,
+      m.away_team_id AS awayTeamId,
+      at.country_name AS awayTeamName,
+      at.flag_emoji AS awayTeamFlagEmoji,
+      m.kickoff_utc AS kickoffUtc,
+      m.status,
+      m.home_score AS homeScore,
+      m.away_score AS awayScore,
+      m.created_at AS createdAt,
+      m.updated_at AS updatedAt
+    FROM matches m
+    INNER JOIN teams ht ON ht.id = m.home_team_id
+    INNER JOIN teams at ON at.id = m.away_team_id
+    WHERE m.tournament_id = ?
+    ORDER BY m.kickoff_utc ASC
     `,
-  )
-    .bind(tournamentId)
-    .all()
+  ).bind(tournamentId).all()
 
   return result.results
 }
@@ -244,152 +220,304 @@ async function getScoringRulesByTournamentId(env: Env, tournamentId: string) {
       updated_at AS updatedAt
     FROM scoring_rules
     WHERE tournament_id = ?
-    LIMIT 1;
+    `,
+  ).bind(tournamentId).first()
+}
+
+async function updateTournament(env: Env, tournamentId: string, body: Record<string, unknown>) {
+  const name = typeof body.name === 'string' ? body.name.trim() : null
+  const roundName = typeof body.roundName === 'string' ? body.roundName.trim() : null
+  const roundStartDate =
+    typeof body.roundStartDate === 'string' ? body.roundStartDate.trim() : null
+  const roundEndDate = typeof body.roundEndDate === 'string' ? body.roundEndDate.trim() : null
+  const resultsMode = typeof body.resultsMode === 'string' ? body.resultsMode.trim() : null
+
+  if (!name && !roundName && !roundStartDate && !roundEndDate && !resultsMode) {
+    return badRequest('No valid tournament fields were provided.')
+  }
+
+  await env.DB.prepare(
+    `
+    UPDATE tournaments
+    SET
+      name = COALESCE(?, name),
+      round_name = COALESCE(?, round_name),
+      round_start_date = COALESCE(?, round_start_date),
+      round_end_date = COALESCE(?, round_end_date),
+      results_mode = COALESCE(?, results_mode),
+      updated_at = datetime('now')
+    WHERE id = ?
     `,
   )
-    .bind(tournamentId)
-    .first()
+    .bind(name, roundName, roundStartDate, roundEndDate, resultsMode, tournamentId)
+    .run()
+
+  const tournament = await getTournamentById(env, tournamentId)
+
+  if (!tournament) {
+    return notFound()
+  }
+
+  return jsonResponse({
+    ok: true,
+    tournament,
+  })
+}
+
+async function updatePlayer(env: Env, playerId: string, body: Record<string, unknown>) {
+  const firstName = typeof body.firstName === 'string' ? body.firstName.trim() : null
+  const lastName = typeof body.lastName === 'string' ? body.lastName.trim() : null
+  const displayName = typeof body.displayName === 'string' ? body.displayName.trim() : null
+  const avatarId = typeof body.avatarId === 'string' ? body.avatarId.trim() : null
+
+  if (!firstName && !lastName && !displayName && !avatarId) {
+    return badRequest('No valid player fields were provided.')
+  }
+
+  await env.DB.prepare(
+    `
+    UPDATE players
+    SET
+      first_name = COALESCE(?, first_name),
+      last_name = COALESCE(?, last_name),
+      display_name = COALESCE(?, display_name),
+      avatar_id = COALESCE(?, avatar_id),
+      updated_at = datetime('now')
+    WHERE id = ?
+    `,
+  )
+    .bind(firstName, lastName, displayName, avatarId, playerId)
+    .run()
+
+  const player = await env.DB.prepare(
+    `
+    SELECT
+      id,
+      tournament_id AS tournamentId,
+      first_name AS firstName,
+      last_name AS lastName,
+      display_name AS displayName,
+      avatar_id AS avatarId,
+      sort_order AS sortOrder,
+      created_at AS createdAt,
+      updated_at AS updatedAt
+    FROM players
+    WHERE id = ?
+    `,
+  ).bind(playerId).first()
+
+  if (!player) {
+    return notFound()
+  }
+
+  return jsonResponse({
+    ok: true,
+    player,
+  })
+}
+
+async function updateMatch(env: Env, matchId: string, body: Record<string, unknown>) {
+  const status = typeof body.status === 'string' ? body.status.trim() : null
+  const homeScore = typeof body.homeScore === 'number' ? body.homeScore : null
+  const awayScore = typeof body.awayScore === 'number' ? body.awayScore : null
+
+  if (!status && homeScore === null && awayScore === null) {
+    return badRequest('No valid match fields were provided.')
+  }
+
+  await env.DB.prepare(
+    `
+    UPDATE matches
+    SET
+      status = COALESCE(?, status),
+      home_score = COALESCE(?, home_score),
+      away_score = COALESCE(?, away_score),
+      updated_at = datetime('now')
+    WHERE id = ?
+    `,
+  )
+    .bind(status, homeScore, awayScore, matchId)
+    .run()
+
+  const match = await env.DB.prepare(
+    `
+    SELECT
+      m.id,
+      m.tournament_id AS tournamentId,
+      m.round_name AS roundName,
+      m.home_team_id AS homeTeamId,
+      ht.country_name AS homeTeamName,
+      ht.flag_emoji AS homeTeamFlagEmoji,
+      m.away_team_id AS awayTeamId,
+      at.country_name AS awayTeamName,
+      at.flag_emoji AS awayTeamFlagEmoji,
+      m.kickoff_utc AS kickoffUtc,
+      m.status,
+      m.home_score AS homeScore,
+      m.away_score AS awayScore,
+      m.created_at AS createdAt,
+      m.updated_at AS updatedAt
+    FROM matches m
+    INNER JOIN teams ht ON ht.id = m.home_team_id
+    INNER JOIN teams at ON at.id = m.away_team_id
+    WHERE m.id = ?
+    `,
+  ).bind(matchId).first()
+
+  if (!match) {
+    return notFound()
+  }
+
+  return jsonResponse({
+    ok: true,
+    match,
+  })
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
-    const pathParts = url.pathname.split('/').filter(Boolean)
+    const pathname = url.pathname
 
     if (request.method === 'OPTIONS') {
       return new Response(null, {
-        headers: corsHeaders,
         status: 204,
+        headers: corsHeaders,
       })
     }
 
-    if (url.pathname === '/api/health' && request.method === 'GET') {
-      const database = await getDatabaseHealth(env)
+    try {
+      if (request.method === 'GET' && pathname === '/api/health') {
+        const database = await getDatabaseHealth(env)
 
-      return jsonResponse({
-        ok: true,
-        service: 'gadx-worldcup-api',
-        environment: env.ENVIRONMENT ?? 'local',
-        version: '0.1.0',
-        database,
-        timestamp: new Date().toISOString(),
-      })
-    }
-
-    if (url.pathname === '/api/debug/counts' && request.method === 'GET') {
-      const counts = await getTableCounts(env)
-
-      return jsonResponse({
-        ok: true,
-        counts,
-      })
-    }
-
-    if (url.pathname === '/api/tournaments' && request.method === 'GET') {
-      const tournaments = await getTournaments(env)
-
-      return jsonResponse({
-        ok: true,
-        tournaments,
-      })
-    }
-
-    if (url.pathname === '/api/teams' && request.method === 'GET') {
-      const teams = await getTeams(env)
-
-      return jsonResponse({
-        ok: true,
-        teams,
-      })
-    }
-
-    if (
-      pathParts[0] === 'api' &&
-      pathParts[1] === 'tournaments' &&
-      pathParts.length === 3 &&
-      request.method === 'GET'
-    ) {
-      const tournamentId = pathParts[2]
-
-      if (!tournamentId) {
-        return badRequest('Missing tournament id.')
+        return jsonResponse({
+          ok: true,
+          service: 'gadx-worldcup-api',
+          environment: env.ENVIRONMENT ?? 'unknown',
+          version: '0.2.0',
+          database,
+          timestamp: new Date().toISOString(),
+        })
       }
 
-      const tournament = await getTournamentById(env, tournamentId)
+      if (request.method === 'GET' && pathname === '/api/debug/counts') {
+        const counts = await getTableCounts(env)
 
-      if (!tournament) {
-        return notFound(url.pathname)
+        return jsonResponse({
+          ok: true,
+          counts,
+        })
       }
 
-      return jsonResponse({
-        ok: true,
-        tournament,
-      })
-    }
+      if (request.method === 'GET' && pathname === '/api/tournaments') {
+        const tournaments = await getTournaments(env)
 
-    if (
-      pathParts[0] === 'api' &&
-      pathParts[1] === 'tournaments' &&
-      pathParts.length === 4 &&
-      pathParts[3] === 'players' &&
-      request.method === 'GET'
-    ) {
-      const tournamentId = pathParts[2]
-
-      if (!tournamentId) {
-        return badRequest('Missing tournament id.')
+        return jsonResponse({
+          ok: true,
+          tournaments,
+        })
       }
 
-      const players = await getPlayersByTournamentId(env, tournamentId)
+      if (request.method === 'GET' && pathname === '/api/teams') {
+        const teams = await getTeams(env)
 
-      return jsonResponse({
-        ok: true,
-        players,
-      })
-    }
-
-    if (
-      pathParts[0] === 'api' &&
-      pathParts[1] === 'tournaments' &&
-      pathParts.length === 4 &&
-      pathParts[3] === 'matches' &&
-      request.method === 'GET'
-    ) {
-      const tournamentId = pathParts[2]
-
-      if (!tournamentId) {
-        return badRequest('Missing tournament id.')
+        return jsonResponse({
+          ok: true,
+          teams,
+        })
       }
 
-      const matches = await getMatchesByTournamentId(env, tournamentId)
+      const tournamentMatch = pathname.match(/^\/api\/tournaments\/([^/]+)$/)
 
-      return jsonResponse({
-        ok: true,
-        matches,
-      })
-    }
+      if (request.method === 'GET' && tournamentMatch) {
+        const tournament = await getTournamentById(env, tournamentMatch[1])
 
-    if (
-      pathParts[0] === 'api' &&
-      pathParts[1] === 'tournaments' &&
-      pathParts.length === 4 &&
-      pathParts[3] === 'scoring-rules' &&
-      request.method === 'GET'
-    ) {
-      const tournamentId = pathParts[2]
+        if (!tournament) {
+          return notFound()
+        }
 
-      if (!tournamentId) {
-        return badRequest('Missing tournament id.')
+        return jsonResponse({
+          ok: true,
+          tournament,
+        })
       }
 
-      const scoringRules = await getScoringRulesByTournamentId(env, tournamentId)
+      if (request.method === 'PATCH' && tournamentMatch) {
+        const body = await parseJsonBody(request)
 
-      return jsonResponse({
-        ok: true,
-        scoringRules,
-      })
+        if (!body) {
+          return badRequest('Invalid JSON body.')
+        }
+
+        return updateTournament(env, tournamentMatch[1], body)
+      }
+
+      const playersMatch = pathname.match(/^\/api\/tournaments\/([^/]+)\/players$/)
+
+      if (request.method === 'GET' && playersMatch) {
+        const players = await getPlayersByTournamentId(env, playersMatch[1])
+
+        return jsonResponse({
+          ok: true,
+          players,
+        })
+      }
+
+      const matchesMatch = pathname.match(/^\/api\/tournaments\/([^/]+)\/matches$/)
+
+      if (request.method === 'GET' && matchesMatch) {
+        const matches = await getMatchesByTournamentId(env, matchesMatch[1])
+
+        return jsonResponse({
+          ok: true,
+          matches,
+        })
+      }
+
+      const scoringRulesMatch = pathname.match(/^\/api\/tournaments\/([^/]+)\/scoring-rules$/)
+
+      if (request.method === 'GET' && scoringRulesMatch) {
+        const scoringRules = await getScoringRulesByTournamentId(env, scoringRulesMatch[1])
+
+        return jsonResponse({
+          ok: true,
+          scoringRules,
+        })
+      }
+
+      const playerMatch = pathname.match(/^\/api\/players\/([^/]+)$/)
+
+      if (request.method === 'PATCH' && playerMatch) {
+        const body = await parseJsonBody(request)
+
+        if (!body) {
+          return badRequest('Invalid JSON body.')
+        }
+
+        return updatePlayer(env, playerMatch[1], body)
+      }
+
+      const matchMatch = pathname.match(/^\/api\/matches\/([^/]+)$/)
+
+      if (request.method === 'PATCH' && matchMatch) {
+        const body = await parseJsonBody(request)
+
+        if (!body) {
+          return badRequest('Invalid JSON body.')
+        }
+
+        return updateMatch(env, matchMatch[1], body)
+      }
+
+      return notFound()
+    } catch (error) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: error instanceof Error ? error.message : 'Unknown server error',
+        },
+        500,
+      )
     }
-
-    return notFound(url.pathname)
   },
-} satisfies ExportedHandler<Env>
+}
