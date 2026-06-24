@@ -251,7 +251,7 @@ function App() {
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <AppHeader milestone="Version 4.6" />
+        <AppHeader milestone="Version 5.3" />
         <AppNavigation />
 
         <section className="grid gap-4 md:grid-cols-4">

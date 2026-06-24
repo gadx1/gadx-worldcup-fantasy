@@ -6,13 +6,15 @@ export function DataSourcePanel() {
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-800">
             Data Source
           </p>
+
           <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
-            Cloudflare D1 is now the source of truth.
+            Cloudflare D1 is the source of truth.
           </h2>
+
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
             Tournament, players, matches, scoring rules, teams, and locked draw data are loaded from
-            the backend API. Local storage is now only used as a fallback when the Worker is not
-            available and for temporary draft draws before they are saved.
+            the production Worker API backed by Cloudflare D1. Local storage is only used as a
+            fallback during development and for temporary draft draws before they are saved.
           </p>
         </div>
 
