@@ -22,7 +22,13 @@ import { mockTournaments } from './data/mockTournaments'
 import { useBackendDraw } from './hooks/useBackendDraw'
 import { useBackendGameData } from './hooks/useBackendGameData'
 import { useLocalStorageState } from './hooks/useLocalStorageState'
-import { deleteLockedDraw, saveLockedDraw, updateMatch, updatePlayer, updateTournament } from './lib/apiClient'
+import {
+  deleteLockedDraw,
+  saveLockedDraw,
+  updateMatch,
+  updatePlayer,
+  updateTournament,
+} from './lib/apiClient'
 import { getDrawReadiness, runFairDraw } from './lib/draw'
 import { getEligibleTeams, getIneligibleTeams } from './lib/eligibility'
 import { calculateStandings } from './lib/scoring'
@@ -38,7 +44,15 @@ const localStorageKeys = {
   tournament: 'gadx-worldcup-draw:tournament',
 }
 
+function getIsAdminMode() {
+  const searchParams = new URLSearchParams(window.location.search)
+
+  return searchParams.get('mode') === 'admin'
+}
+
 function App() {
+  const isAdminMode = getIsAdminMode()
+
   const backendGameData = useBackendGameData(activeTournamentId)
   const backendDraw = useBackendDraw(activeTournamentId)
   const isBackendDataReady = backendGameData.isBackendDataReady
@@ -98,7 +112,7 @@ function App() {
   const completedMatchCount = matches.filter((match) => match.status === 'fulltime').length
 
   function handleRunDraw() {
-    if (!drawReadiness.canRunDraw) {
+    if (!isAdminMode || !drawReadiness.canRunDraw) {
       return
     }
 
@@ -107,7 +121,7 @@ function App() {
   }
 
   async function handleSaveAndLockDraw() {
-    if (draftAssignments.length === 0 || lockedAssignments.length > 0) {
+    if (!isAdminMode || draftAssignments.length === 0 || lockedAssignments.length > 0) {
       return
     }
 
@@ -130,6 +144,10 @@ function App() {
   }
 
   async function handleResetLockedDraw() {
+    if (!isAdminMode) {
+      return
+    }
+
     if (isBackendDataReady && isBackendDrawReady) {
       await deleteLockedDraw(activeTournament.id)
       await backendDraw.reload()
@@ -142,7 +160,7 @@ function App() {
   }
 
   async function handleUpdateTournament(updates: Partial<Tournament>) {
-    if (isDrawLocked) {
+    if (!isAdminMode || isDrawLocked) {
       return
     }
 
@@ -169,7 +187,7 @@ function App() {
   }
 
   function handleResetTournament() {
-    if (isDrawLocked || isBackendDataReady) {
+    if (!isAdminMode || isDrawLocked || isBackendDataReady) {
       return
     }
 
@@ -178,7 +196,7 @@ function App() {
   }
 
   async function handleUpdatePlayer(playerId: string, updates: Partial<Player>) {
-    if (isDrawLocked) {
+    if (!isAdminMode || isDrawLocked) {
       return
     }
 
@@ -209,7 +227,7 @@ function App() {
   }
 
   function handleResetPlayers() {
-    if (isDrawLocked || isBackendDataReady) {
+    if (!isAdminMode || isDrawLocked || isBackendDataReady) {
       return
     }
 
@@ -218,6 +236,10 @@ function App() {
   }
 
   async function handleUpdateMatch(matchId: string, updates: Partial<Match>) {
+    if (!isAdminMode) {
+      return
+    }
+
     if (isBackendDataReady) {
       await updateMatch(matchId, {
         status: updates.status,
@@ -241,7 +263,7 @@ function App() {
   }
 
   function handleResetMatches() {
-    if (isBackendDataReady) {
+    if (!isAdminMode || isBackendDataReady) {
       return
     }
 
@@ -251,7 +273,7 @@ function App() {
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <AppHeader milestone="Version 5.3" />
+        <AppHeader milestone="Version 5.6" />
         <AppNavigation />
 
         <section className="grid gap-4 md:grid-cols-4">
@@ -260,6 +282,32 @@ function App() {
           <MetricCard label="Eligible Teams" value={drawReadiness.eligibleTeamCount} />
           <MetricCard label="Completed Matches" value={completedMatchCount} />
         </section>
+
+        <article className="rounded-3xl border border-slate-900/10 bg-white/80 p-6 shadow-sm">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">
+                Access Mode
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight">
+                {isAdminMode ? 'Admin controls enabled.' : 'Viewer mode enabled.'}
+              </h2>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+                {isAdminMode
+                  ? 'You are using the admin URL. Tournament setup, player setup, match admin, and draw controls are available.'
+                  : 'This is the player-safe view. Tournament setup, player setup, match admin, and draw controls are hidden.'}
+              </p>
+            </div>
+
+            <span
+              className={`w-fit rounded-full px-4 py-2 text-sm font-semibold ${
+                isAdminMode ? 'bg-slate-950 text-white' : 'bg-emerald-100 text-emerald-800'
+              }`}
+            >
+              {isAdminMode ? 'Admin' : 'Viewer'}
+            </span>
+          </div>
+        </article>
 
         {backendGameData.status === 'error' && (
           <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
@@ -277,59 +325,78 @@ function App() {
           </div>
         )}
 
-        <ApiStatusPanel />
+        {isAdminMode && <ApiStatusPanel />}
 
-        <DataSourcePanel />
+        {isAdminMode && <DataSourcePanel />}
 
-        <TournamentSetupPanel
-          tournament={activeTournament}
-          isLocked={isDrawLocked}
-          isReadOnly={false}
-          statusLabel={undefined}
-          readOnlyReason={undefined}
-          onUpdateTournament={handleUpdateTournament}
-          onResetTournament={handleResetTournament}
-        />
-
-        <PlayerSetupPanel
-          players={tournamentPlayers}
-          isLocked={isDrawLocked}
-          isReadOnly={false}
-          statusLabel={undefined}
-          readOnlyReason={undefined}
-          onUpdatePlayer={handleUpdatePlayer}
-        />
-
-        {!isDrawLocked && !isBackendDataReady && (
-          <div className="-mt-4 flex justify-end">
-            <button
-              className="rounded-full border border-slate-900/10 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-700 hover:text-emerald-800"
-              onClick={handleResetPlayers}
-              type="button"
-            >
-              Reset Players
-            </button>
-          </div>
+        {!isDrawLocked && !isAdminMode && (
+          <article className="rounded-3xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-700">
+              Draw Pending
+            </p>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-amber-950">
+              The tournament draw has not been locked yet.
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-amber-900">
+              Once the admin runs and locks the draw, player team assignments will appear in the
+              leaderboard and remain visible after refresh.
+            </p>
+          </article>
         )}
 
-        <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-          <EligibleTeamsPanel
-            eligibleTeams={eligibleTeams}
-            ineligibleTeams={ineligibleTeams}
-            drawReadiness={drawReadiness}
-          />
+        {isAdminMode && (
+          <>
+            <TournamentSetupPanel
+              tournament={activeTournament}
+              isLocked={isDrawLocked}
+              isReadOnly={false}
+              statusLabel={undefined}
+              readOnlyReason={undefined}
+              onUpdateTournament={handleUpdateTournament}
+              onResetTournament={handleResetTournament}
+            />
 
-          <DrawControlPanel
-            players={tournamentPlayers}
-            teams={teams}
-            draftAssignments={draftAssignments}
-            lockedAssignments={lockedAssignments}
-            drawReadiness={drawReadiness}
-            onRunDraw={handleRunDraw}
-            onSaveAndLock={handleSaveAndLockDraw}
-            onResetLockedDraw={handleResetLockedDraw}
-          />
-        </section>
+            <PlayerSetupPanel
+              players={tournamentPlayers}
+              isLocked={isDrawLocked}
+              isReadOnly={false}
+              statusLabel={undefined}
+              readOnlyReason={undefined}
+              onUpdatePlayer={handleUpdatePlayer}
+            />
+
+            {!isDrawLocked && !isBackendDataReady && (
+              <div className="-mt-4 flex justify-end">
+                <button
+                  className="rounded-full border border-slate-900/10 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-700 hover:text-emerald-800"
+                  onClick={handleResetPlayers}
+                  type="button"
+                >
+                  Reset Players
+                </button>
+              </div>
+            )}
+
+            <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+              <EligibleTeamsPanel
+                eligibleTeams={eligibleTeams}
+                ineligibleTeams={ineligibleTeams}
+                drawReadiness={drawReadiness}
+              />
+
+              <DrawControlPanel
+                players={tournamentPlayers}
+                teams={teams}
+                draftAssignments={draftAssignments}
+                lockedAssignments={lockedAssignments}
+                drawReadiness={drawReadiness}
+                onRunDraw={handleRunDraw}
+                onSaveAndLock={handleSaveAndLockDraw}
+                onResetLockedDraw={handleResetLockedDraw}
+              />
+            </section>
+          </>
+        )}
 
         <LeaderboardPanel
           players={tournamentPlayers}
@@ -338,19 +405,21 @@ function App() {
           standings={standings}
         />
 
-        <MatchAdminPanel
-          matches={matches}
-          teams={teams}
-          isReadOnly={false}
-          statusLabel={undefined}
-          readOnlyReason={undefined}
-          onUpdateMatch={handleUpdateMatch}
-          onResetMatches={handleResetMatches}
-        />
+        {isAdminMode && (
+          <MatchAdminPanel
+            matches={matches}
+            teams={teams}
+            isReadOnly={false}
+            statusLabel={undefined}
+            readOnlyReason={undefined}
+            onUpdateMatch={handleUpdateMatch}
+            onResetMatches={handleResetMatches}
+          />
+        )}
 
         <MatchResultsPanel matches={matches} teams={teams} scoringRules={scoringRules} />
 
-        <FeatureSections adminSections={adminSections} viewerSections={viewerSections} />
+        {isAdminMode && <FeatureSections adminSections={adminSections} viewerSections={viewerSections} />}
 
         <AppFooter />
       </section>
