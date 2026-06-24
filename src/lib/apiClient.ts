@@ -91,6 +91,27 @@ export type ApiScoringRules = {
   updatedAt: string
 }
 
+export type ApiDraw = {
+  id: string
+  tournamentId: string
+  status: string
+  createdByUserId: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type ApiDrawAssignment = {
+  id: string
+  drawId: string
+  tournamentId: string
+  playerId: string
+  playerDisplayName: string
+  teamId: string
+  teamName: string
+  teamFlagEmoji: string
+  createdAt: string
+}
+
 export type ApiTournamentsResponse = {
   ok: boolean
   tournaments: ApiTournament[]
@@ -131,6 +152,12 @@ export type ApiScoringRulesResponse = {
   scoringRules: ApiScoringRules | null
 }
 
+export type ApiDrawResponse = {
+  ok: boolean
+  draw: ApiDraw | null
+  assignments: ApiDrawAssignment[]
+}
+
 export type UpdateTournamentPayload = {
   name?: string
   roundName?: string
@@ -152,8 +179,32 @@ export type UpdateMatchPayload = {
   awayScore?: number
 }
 
+export type SaveDrawPayload = {
+  createdByUserId: string
+  assignments: {
+    playerId: string
+    teamId: string
+  }[]
+}
+
 async function apiGet<TResponse>(path: string): Promise<TResponse> {
   const response = await fetch(`${API_BASE_URL}${path}`)
+
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status} ${response.statusText}`)
+  }
+
+  return response.json() as Promise<TResponse>
+}
+
+async function apiPost<TResponse>(path: string, body: Record<string, unknown>): Promise<TResponse> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    body: JSON.stringify(body),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    method: 'POST',
+  })
 
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status} ${response.statusText}`)
@@ -169,6 +220,18 @@ async function apiPatch<TResponse>(path: string, body: Record<string, unknown>):
       'Content-Type': 'application/json',
     },
     method: 'PATCH',
+  })
+
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status} ${response.statusText}`)
+  }
+
+  return response.json() as Promise<TResponse>
+}
+
+async function apiDelete<TResponse>(path: string): Promise<TResponse> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'DELETE',
   })
 
   if (!response.ok) {
@@ -210,6 +273,10 @@ export function fetchScoringRulesByTournamentId(tournamentId: string) {
   return apiGet<ApiScoringRulesResponse>(`/api/tournaments/${tournamentId}/scoring-rules`)
 }
 
+export function fetchLockedDrawByTournamentId(tournamentId: string) {
+  return apiGet<ApiDrawResponse>(`/api/tournaments/${tournamentId}/draw`)
+}
+
 export function updateTournament(tournamentId: string, payload: UpdateTournamentPayload) {
   return apiPatch<ApiTournamentResponse>(`/api/tournaments/${tournamentId}`, payload)
 }
@@ -220,4 +287,12 @@ export function updatePlayer(playerId: string, payload: UpdatePlayerPayload) {
 
 export function updateMatch(matchId: string, payload: UpdateMatchPayload) {
   return apiPatch<ApiMatchResponse>(`/api/matches/${matchId}`, payload)
+}
+
+export function saveLockedDraw(tournamentId: string, payload: SaveDrawPayload) {
+  return apiPost<ApiDrawResponse>(`/api/tournaments/${tournamentId}/draw`, payload)
+}
+
+export function deleteLockedDraw(tournamentId: string) {
+  return apiDelete<ApiDrawResponse>(`/api/tournaments/${tournamentId}/draw`)
 }

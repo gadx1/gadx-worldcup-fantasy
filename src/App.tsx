@@ -19,15 +19,17 @@ import { mockPlayers } from './data/mockPlayers'
 import { mockScoringRules } from './data/mockScoringRules'
 import { mockTeams } from './data/mockTeams'
 import { mockTournaments } from './data/mockTournaments'
+import { useBackendDraw } from './hooks/useBackendDraw'
 import { useBackendGameData } from './hooks/useBackendGameData'
 import { useLocalStorageState } from './hooks/useLocalStorageState'
+import { deleteLockedDraw, saveLockedDraw, updateMatch, updatePlayer, updateTournament } from './lib/apiClient'
 import { getDrawReadiness, runFairDraw } from './lib/draw'
 import { getEligibleTeams, getIneligibleTeams } from './lib/eligibility'
 import { calculateStandings } from './lib/scoring'
-import { updateMatch, updatePlayer, updateTournament } from './lib/apiClient'
 import type { Match, Player, TeamAssignment, Tournament } from './types/domain'
 
 const activeTournamentId = 'tournament_dublin_friends'
+const activeUserId = 'user_admin'
 
 const localStorageKeys = {
   lockedAssignments: 'gadx-worldcup-draw:locked-assignments',
@@ -38,7 +40,9 @@ const localStorageKeys = {
 
 function App() {
   const backendGameData = useBackendGameData(activeTournamentId)
+  const backendDraw = useBackendDraw(activeTournamentId)
   const isBackendDataReady = backendGameData.isBackendDataReady
+  const isBackendDrawReady = backendDraw.status === 'ready'
 
   const [localTournament, setLocalTournament, resetLocalTournament] =
     useLocalStorageState<Tournament>(localStorageKeys.tournament, mockTournaments[0])
@@ -68,9 +72,11 @@ function App() {
   const drawReadiness = getDrawReadiness(tournamentPlayers, eligibleTeams)
 
   const [draftAssignments, setDraftAssignments] = useState<TeamAssignment[]>([])
-  const [lockedAssignments, setLockedAssignments, resetLockedAssignments] = useLocalStorageState<
-    TeamAssignment[]
-  >(localStorageKeys.lockedAssignments, [])
+  const [localLockedAssignments, setLocalLockedAssignments, resetLocalLockedAssignments] =
+    useLocalStorageState<TeamAssignment[]>(localStorageKeys.lockedAssignments, [])
+
+  const lockedAssignments =
+    isBackendDataReady && isBackendDrawReady ? backendDraw.assignments : localLockedAssignments
 
   const isDrawLocked = lockedAssignments.length > 0
 
@@ -100,17 +106,38 @@ function App() {
     setDraftAssignments(assignments)
   }
 
-  function handleSaveAndLockDraw() {
+  async function handleSaveAndLockDraw() {
     if (draftAssignments.length === 0 || lockedAssignments.length > 0) {
       return
     }
 
-    setLockedAssignments(draftAssignments)
+    if (isBackendDataReady && isBackendDrawReady) {
+      await saveLockedDraw(activeTournament.id, {
+        createdByUserId: activeUserId,
+        assignments: draftAssignments.map((assignment) => ({
+          playerId: assignment.playerId,
+          teamId: assignment.teamId,
+        })),
+      })
+
+      await backendDraw.reload()
+      setDraftAssignments([])
+      return
+    }
+
+    setLocalLockedAssignments(draftAssignments)
     setDraftAssignments([])
   }
 
-  function handleResetLockedDraw() {
-    resetLockedAssignments()
+  async function handleResetLockedDraw() {
+    if (isBackendDataReady && isBackendDrawReady) {
+      await deleteLockedDraw(activeTournament.id)
+      await backendDraw.reload()
+      setDraftAssignments([])
+      return
+    }
+
+    resetLocalLockedAssignments()
     setDraftAssignments([])
   }
 
@@ -224,7 +251,7 @@ function App() {
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <AppHeader milestone="Version 4.3" />
+        <AppHeader milestone="Version 4.5" />
         <AppNavigation />
 
         <section className="grid gap-4 md:grid-cols-4">
@@ -239,6 +266,14 @@ function App() {
             Backend game data is not available yet, so the app is temporarily using local fallback
             data. Start the Worker with <code>npm run worker:dev</code>. Error:{' '}
             {backendGameData.errorMessage}
+          </div>
+        )}
+
+        {backendDraw.status === 'error' && (
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
+            Backend draw data is not available yet, so the app is temporarily using local fallback
+            draw state. Start the Worker with <code>npm run worker:dev</code>. Error:{' '}
+            {backendDraw.errorMessage}
           </div>
         )}
 
