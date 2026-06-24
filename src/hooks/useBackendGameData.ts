@@ -100,13 +100,14 @@ function mapApiTeam(apiTeam: {
   flagEmoji: string
   tournamentStatus: string
   qualificationStatus?: string
+  isActive?: boolean
 }): Team {
   return {
     id: apiTeam.id,
     countryName: apiTeam.countryName,
     countryCode: apiTeam.countryCode,
     flagEmoji: apiTeam.flagEmoji,
-    tournamentStatus: apiTeam.tournamentStatus as Team['tournamentStatus'],
+    tournamentStatus: (apiTeam.isActive ? 'active' : apiTeam.tournamentStatus) as Team['tournamentStatus'],
     qualificationStatus: (apiTeam.qualificationStatus ?? 'qualified') as Team['qualificationStatus'],
   }
 }
