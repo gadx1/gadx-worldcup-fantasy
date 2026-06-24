@@ -19,7 +19,7 @@ import { mockPlayers } from './data/mockPlayers'
 import { mockScoringRules } from './data/mockScoringRules'
 import { mockTeams } from './data/mockTeams'
 import { mockTournaments } from './data/mockTournaments'
-import { useBackendTournament } from './hooks/useBackendTournament'
+import { useBackendGameData } from './hooks/useBackendGameData'
 import { useLocalStorageState } from './hooks/useLocalStorageState'
 import { getDrawReadiness, runFairDraw } from './lib/draw'
 import { getEligibleTeams, getIneligibleTeams } from './lib/eligibility'
@@ -36,29 +36,34 @@ const localStorageKeys = {
 }
 
 function App() {
-  const defaultTournament = mockTournaments[0]
-  const backendTournament = useBackendTournament(activeTournamentId)
+  const backendGameData = useBackendGameData(activeTournamentId)
+  const isBackendDataReady = backendGameData.isBackendDataReady
 
   const [localTournament, setLocalTournament, resetLocalTournament] =
-    useLocalStorageState<Tournament>(localStorageKeys.tournament, defaultTournament)
+    useLocalStorageState<Tournament>(localStorageKeys.tournament, mockTournaments[0])
 
-  const activeTournament = backendTournament.tournament ?? localTournament
-  const isBackendTournament = backendTournament.isBackendTournament
-
-  const [players, setPlayers, resetPlayers] = useLocalStorageState<Player[]>(
+  const [localPlayers, setLocalPlayers, resetPlayers] = useLocalStorageState<Player[]>(
     localStorageKeys.players,
     mockPlayers,
   )
 
-  const [matches, setMatches, resetMatches] = useLocalStorageState<Match[]>(
+  const [localMatches, setLocalMatches, resetMatches] = useLocalStorageState<Match[]>(
     localStorageKeys.matches,
     mockMatches,
   )
 
-  const tournamentPlayers = players.filter((player) => player.tournamentId === activeTournament.id)
+  const activeTournament = backendGameData.data.tournament ?? localTournament
+  const players = isBackendDataReady ? backendGameData.data.players : localPlayers
+  const matches = isBackendDataReady ? backendGameData.data.matches : localMatches
+  const teams = isBackendDataReady ? backendGameData.data.teams : mockTeams
+  const scoringRules =
+    isBackendDataReady && backendGameData.data.scoringRules
+      ? backendGameData.data.scoringRules
+      : mockScoringRules
 
-  const eligibleTeams = getEligibleTeams(mockTeams, matches, activeTournament)
-  const ineligibleTeams = getIneligibleTeams(mockTeams, matches, activeTournament)
+  const tournamentPlayers = players.filter((player) => player.tournamentId === activeTournament.id)
+  const eligibleTeams = getEligibleTeams(teams, matches, activeTournament)
+  const ineligibleTeams = getIneligibleTeams(teams, matches, activeTournament)
   const drawReadiness = getDrawReadiness(tournamentPlayers, eligibleTeams)
 
   const [draftAssignments, setDraftAssignments] = useState<TeamAssignment[]>([])
@@ -79,7 +84,7 @@ function App() {
     tournamentPlayers,
     activeAssignments,
     matches,
-    mockScoringRules,
+    scoringRules,
     activeTournament.id,
   )
 
@@ -109,7 +114,7 @@ function App() {
   }
 
   function handleUpdateTournament(updates: Partial<Tournament>) {
-    if (isDrawLocked || isBackendTournament) {
+    if (isDrawLocked || isBackendDataReady) {
       return
     }
 
@@ -123,7 +128,7 @@ function App() {
   }
 
   function handleResetTournament() {
-    if (isDrawLocked || isBackendTournament) {
+    if (isDrawLocked || isBackendDataReady) {
       return
     }
 
@@ -132,11 +137,11 @@ function App() {
   }
 
   function handleUpdatePlayer(playerId: string, updates: Partial<Player>) {
-    if (isDrawLocked) {
+    if (isDrawLocked || isBackendDataReady) {
       return
     }
 
-    setPlayers((currentPlayers) =>
+    setLocalPlayers((currentPlayers) =>
       currentPlayers.map((player) =>
         player.id === playerId
           ? {
@@ -151,7 +156,7 @@ function App() {
   }
 
   function handleResetPlayers() {
-    if (isDrawLocked) {
+    if (isDrawLocked || isBackendDataReady) {
       return
     }
 
@@ -160,7 +165,11 @@ function App() {
   }
 
   function handleUpdateMatch(matchId: string, updates: Partial<Match>) {
-    setMatches((currentMatches) =>
+    if (isBackendDataReady) {
+      return
+    }
+
+    setLocalMatches((currentMatches) =>
       currentMatches.map((match) =>
         match.id === matchId
           ? {
@@ -173,13 +182,17 @@ function App() {
   }
 
   function handleResetMatches() {
+    if (isBackendDataReady) {
+      return
+    }
+
     resetMatches()
   }
 
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <AppHeader milestone="Version 4.0" />
+        <AppHeader milestone="Version 4.1" />
         <AppNavigation />
 
         <section className="grid gap-4 md:grid-cols-4">
@@ -189,11 +202,11 @@ function App() {
           <MetricCard label="Completed Matches" value={completedMatchCount} />
         </section>
 
-        {backendTournament.status === 'error' && (
+        {backendGameData.status === 'error' && (
           <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
-            Backend tournament is not available yet, so the app is temporarily using the local
-            fallback tournament. Start the Worker with <code>npm run worker:dev</code>. Error:{' '}
-            {backendTournament.errorMessage}
+            Backend game data is not available yet, so the app is temporarily using local fallback
+            data. Start the Worker with <code>npm run worker:dev</code>. Error:{' '}
+            {backendGameData.errorMessage}
           </div>
         )}
 
@@ -204,10 +217,10 @@ function App() {
         <TournamentSetupPanel
           tournament={activeTournament}
           isLocked={isDrawLocked}
-          isReadOnly={isBackendTournament}
-          statusLabel={isBackendTournament ? 'Backend Read' : undefined}
+          isReadOnly={isBackendDataReady}
+          statusLabel={isBackendDataReady ? 'Backend Read' : undefined}
           readOnlyReason={
-            isBackendTournament
+            isBackendDataReady
               ? 'This tournament is now being read from D1 through the Worker API. Editing will be re-enabled after backend write endpoints are added.'
               : undefined
           }
@@ -218,10 +231,17 @@ function App() {
         <PlayerSetupPanel
           players={tournamentPlayers}
           isLocked={isDrawLocked}
+          isReadOnly={isBackendDataReady}
+          statusLabel={isBackendDataReady ? 'Backend Read' : undefined}
+          readOnlyReason={
+            isBackendDataReady
+              ? 'Players are now being read from D1 through the Worker API. Editing will be re-enabled after backend write endpoints are added.'
+              : undefined
+          }
           onUpdatePlayer={handleUpdatePlayer}
         />
 
-        {!isDrawLocked && (
+        {!isDrawLocked && !isBackendDataReady && (
           <div className="-mt-4 flex justify-end">
             <button
               className="rounded-full border border-slate-900/10 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-700 hover:text-emerald-800"
@@ -242,7 +262,7 @@ function App() {
 
           <DrawControlPanel
             players={tournamentPlayers}
-            teams={mockTeams}
+            teams={teams}
             draftAssignments={draftAssignments}
             lockedAssignments={lockedAssignments}
             drawReadiness={drawReadiness}
@@ -254,23 +274,26 @@ function App() {
 
         <LeaderboardPanel
           players={tournamentPlayers}
-          teams={mockTeams}
+          teams={teams}
           assignments={activeAssignments}
           standings={standings}
         />
 
         <MatchAdminPanel
           matches={matches}
-          teams={mockTeams}
+          teams={teams}
+          isReadOnly={isBackendDataReady}
+          statusLabel={isBackendDataReady ? 'Backend Read' : undefined}
+          readOnlyReason={
+            isBackendDataReady
+              ? 'Matches are now being read from D1 through the Worker API. Manual editing will be re-enabled after backend write endpoints are added.'
+              : undefined
+          }
           onUpdateMatch={handleUpdateMatch}
           onResetMatches={handleResetMatches}
         />
 
-        <MatchResultsPanel
-          matches={matches}
-          teams={mockTeams}
-          scoringRules={mockScoringRules}
-        />
+        <MatchResultsPanel matches={matches} teams={teams} scoringRules={scoringRules} />
 
         <FeatureSections adminSections={adminSections} viewerSections={viewerSections} />
 

@@ -1,12 +1,25 @@
 import type { Player } from '../types/domain'
 
 interface PlayerSetupPanelProps {
-  players: Player[]
   isLocked: boolean
+  isReadOnly?: boolean
   onUpdatePlayer: (playerId: string, updates: Partial<Player>) => void
+  players: Player[]
+  readOnlyReason?: string
+  statusLabel?: string
 }
 
-export function PlayerSetupPanel({ players, isLocked, onUpdatePlayer }: PlayerSetupPanelProps) {
+export function PlayerSetupPanel({
+  players,
+  isLocked,
+  isReadOnly = false,
+  onUpdatePlayer,
+  readOnlyReason,
+  statusLabel,
+}: PlayerSetupPanelProps) {
+  const isDisabled = isLocked || isReadOnly
+  const visibleStatusLabel = statusLabel ?? (isLocked ? 'Locked' : 'Editable')
+
   return (
     <article className="rounded-3xl border border-slate-900/10 bg-white/80 p-8 shadow-sm">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -25,10 +38,10 @@ export function PlayerSetupPanel({ players, isLocked, onUpdatePlayer }: PlayerSe
 
         <span
           className={`w-fit rounded-full px-4 py-2 text-sm font-semibold ${
-            isLocked ? 'bg-slate-950 text-white' : 'bg-emerald-100 text-emerald-800'
+            isDisabled ? 'bg-slate-950 text-white' : 'bg-emerald-100 text-emerald-800'
           }`}
         >
-          {isLocked ? 'Locked' : 'Editable'}
+          {visibleStatusLabel}
         </span>
       </div>
 
@@ -36,6 +49,12 @@ export function PlayerSetupPanel({ players, isLocked, onUpdatePlayer }: PlayerSe
         <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
           Player editing is disabled because the draw has already been saved and locked. Use
           Reset Local Draw during development if you need to change player setup.
+        </div>
+      )}
+
+      {isReadOnly && readOnlyReason && (
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm leading-6 text-slate-700">
+          {readOnlyReason}
         </div>
       )}
 
@@ -63,7 +82,7 @@ export function PlayerSetupPanel({ players, isLocked, onUpdatePlayer }: PlayerSe
                 First name
                 <input
                   className="rounded-xl border border-slate-900/10 bg-white px-3 py-2 text-slate-950 outline-none transition focus:border-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
-                  disabled={isLocked}
+                  disabled={isDisabled}
                   onChange={(event) =>
                     onUpdatePlayer(player.id, {
                       firstName: event.target.value,
@@ -78,7 +97,7 @@ export function PlayerSetupPanel({ players, isLocked, onUpdatePlayer }: PlayerSe
                 Last name
                 <input
                   className="rounded-xl border border-slate-900/10 bg-white px-3 py-2 text-slate-950 outline-none transition focus:border-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
-                  disabled={isLocked}
+                  disabled={isDisabled}
                   onChange={(event) =>
                     onUpdatePlayer(player.id, {
                       lastName: event.target.value,
@@ -93,7 +112,7 @@ export function PlayerSetupPanel({ players, isLocked, onUpdatePlayer }: PlayerSe
                 Display name
                 <input
                   className="rounded-xl border border-slate-900/10 bg-white px-3 py-2 text-slate-950 outline-none transition focus:border-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
-                  disabled={isLocked}
+                  disabled={isDisabled}
                   onChange={(event) =>
                     onUpdatePlayer(player.id, {
                       displayName: event.target.value,
@@ -108,7 +127,7 @@ export function PlayerSetupPanel({ players, isLocked, onUpdatePlayer }: PlayerSe
                 Avatar ID
                 <select
                   className="rounded-xl border border-slate-900/10 bg-white px-3 py-2 text-slate-950 outline-none transition focus:border-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
-                  disabled={isLocked}
+                  disabled={isDisabled}
                   onChange={(event) =>
                     onUpdatePlayer(player.id, {
                       avatarId: event.target.value,
