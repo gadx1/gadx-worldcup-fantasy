@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AdminGuidePanel } from './components/AdminGuidePanel'
 import { ApiStatusPanel } from './components/ApiStatusPanel'
 import { AppFooter } from './components/AppFooter'
@@ -45,30 +45,75 @@ const localStorageKeys = {
   tournament: 'gadx-worldcup-draw:tournament',
 }
 
-function getIsAdminMode() {
-  const searchParams = new URLSearchParams(window.location.search)
-
-  const href = window.location.href.toLowerCase()
-  const pathname = window.location.pathname.toLowerCase()
-  const decodedPathname = decodeURIComponent(pathname)
-  const hash = window.location.hash.toLowerCase()
+function getIsAdminRoute() {
+  const pathname = decodeURIComponent(window.location.pathname.toLowerCase())
 
   return (
-    href.includes('/admin') ||
-    href.includes('/manage') ||
-    pathname.includes('/admin') ||
-    pathname.includes('/manage') ||
-    decodedPathname.includes('/admin') ||
-    decodedPathname.includes('/manage') ||
-    hash.includes('admin') ||
-    hash.includes('manage') ||
-    searchParams.get('mode') === 'admin' ||
-    searchParams.get('admin') === 'true'
+    pathname === '/admin' ||
+    pathname.startsWith('/admin/') ||
+    pathname === '/manage' ||
+    pathname.startsWith('/manage/')
   )
 }
 
+type AdminAuthStatus = 'checking' | 'admin' | 'public'
+
+function useAdminAuth(): AdminAuthStatus {
+  const [status, setStatus] = useState<AdminAuthStatus>('checking')
+
+  useEffect(() => {
+    let isActive = true
+
+    async function resolveAdmin() {
+      // If the user is on the admin route, trust the route immediately.
+      // Cloudflare Access already gated this path, so reaching it means admin.
+      if (getIsAdminRoute()) {
+        if (isActive) {
+          setStatus('admin')
+        }
+        return
+      }
+
+      // The user may have landed on "/" after the Access login redirect.
+      // Verify a real Access identity exists before deciding.
+      try {
+        const response = await fetch('/cdn-cgi/access/get-identity', {
+          credentials: 'include',
+        })
+
+        if (!isActive) {
+          return
+        }
+
+        if (response.ok) {
+          const identity = await response.json()
+          if (isActive) {
+            setStatus(identity && identity.email ? 'admin' : 'public')
+          }
+          return
+        }
+
+        setStatus('public')
+      } catch {
+        if (isActive) {
+          setStatus('public')
+        }
+      }
+    }
+
+    resolveAdmin()
+
+    return () => {
+      isActive = false
+    }
+  }, [])
+
+  return status
+}
+
 function App() {
-  const isAdminMode = getIsAdminMode()
+  const adminAuthStatus = useAdminAuth()
+  const isAdminMode = adminAuthStatus === 'admin'
 
   const backendGameData = useBackendGameData(activeTournamentId)
   const backendDraw = useBackendDraw(activeTournamentId)
@@ -285,6 +330,16 @@ function App() {
     }
 
     resetMatches()
+  }
+
+  if (adminAuthStatus === 'checking') {
+    return (
+      <main className="flex min-h-screen items-center justify-center px-6 py-6 text-slate-950">
+        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">
+          Loading…
+        </p>
+      </main>
+    )
   }
 
   return (

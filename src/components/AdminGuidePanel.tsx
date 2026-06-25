@@ -80,7 +80,7 @@ export function AdminGuidePanel() {
           </div>
           <div>
             <span className="font-semibold">Protected admin view:</span>{' '}
-            https://gadx-worldcup-fantasy.pages.dev/admin*
+            https://gadx-worldcup-fantasy.pages.dev/admin
           </div>
         </div>
       </div>
