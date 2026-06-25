@@ -32,7 +32,7 @@ function formatKickoffDate(dateIso: string) {
   return new Intl.DateTimeFormat('en-IE', {
     dateStyle: 'medium',
     timeStyle: 'short',
-    timeZone: 'Europe/Dublin',
+    timeZone: 'Europe/Prague',
   }).format(new Date(dateIso))
 }
 
@@ -54,7 +54,7 @@ export function MatchResultsPanel({ matches, teams, scoringRules }: MatchResults
         </div>
 
         <span className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
-          Dublin Time
+          Prague Time
         </span>
       </div>
 

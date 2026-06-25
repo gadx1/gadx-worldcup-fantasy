@@ -26,7 +26,7 @@ function formatDate(dateIso: string) {
   return new Intl.DateTimeFormat('en-IE', {
     dateStyle: 'medium',
     timeStyle: 'short',
-    timeZone: 'Europe/Dublin',
+    timeZone: 'Europe/Prague',
   }).format(new Date(dateIso))
 }
 
