@@ -71,3 +71,4 @@ export function runFairDraw(players: Player[], eligibleTeams: Team[]): TeamAssig
     assignedAt: new Date().toISOString(),
   }))
 }
+
