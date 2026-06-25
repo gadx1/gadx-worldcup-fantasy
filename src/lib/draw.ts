@@ -1,6 +1,6 @@
 import type { Player, Team, TeamAssignment } from '../types/domain'
 
-export interface DrawReadiness {
+export type DrawReadiness = {
   canRunDraw: boolean
   playerCount: number
   eligibleTeamCount: number
@@ -8,86 +8,66 @@ export interface DrawReadiness {
   reason?: string
 }
 
+function shuffle<T>(items: T[]) {
+  return [...items].sort(() => Math.random() - 0.5)
+}
+
 export function getDrawReadiness(players: Player[], eligibleTeams: Team[]): DrawReadiness {
-  if (players.length === 0) {
+  const playerCount = players.length
+  const eligibleTeamCount = eligibleTeams.length
+
+  if (playerCount === 0) {
     return {
       canRunDraw: false,
-      playerCount: 0,
-      eligibleTeamCount: eligibleTeams.length,
+      playerCount,
+      eligibleTeamCount,
       teamsPerPlayer: 0,
-      reason: 'At least one player is required to run the draw.',
+      reason: 'Add players before running the draw.',
     }
   }
 
-  if (eligibleTeams.length === 0) {
+  if (eligibleTeamCount === 0) {
     return {
       canRunDraw: false,
-      playerCount: players.length,
-      eligibleTeamCount: 0,
+      playerCount,
+      eligibleTeamCount,
       teamsPerPlayer: 0,
-      reason: 'At least one eligible team is required to run the draw.',
+      reason: 'No eligible teams are available for the selected tournament window.',
     }
   }
 
-  if (eligibleTeams.length % players.length !== 0) {
+  if (eligibleTeamCount < playerCount) {
     return {
       canRunDraw: false,
-      playerCount: players.length,
-      eligibleTeamCount: eligibleTeams.length,
+      playerCount,
+      eligibleTeamCount,
       teamsPerPlayer: 0,
-      reason: 'Eligible teams must divide equally across all players.',
+      reason: 'There must be at least one eligible team per player.',
     }
   }
 
   return {
     canRunDraw: true,
-    playerCount: players.length,
-    eligibleTeamCount: eligibleTeams.length,
-    teamsPerPlayer: eligibleTeams.length / players.length,
+    playerCount,
+    eligibleTeamCount,
+    teamsPerPlayer: 1,
   }
-}
-
-function shuffleTeams(teams: Team[]) {
-  const shuffledTeams = [...teams]
-
-  for (let currentIndex = shuffledTeams.length - 1; currentIndex > 0; currentIndex -= 1) {
-    const randomIndex = Math.floor(Math.random() * (currentIndex + 1))
-    const currentTeam = shuffledTeams[currentIndex]
-    const randomTeam = shuffledTeams[randomIndex]
-
-    shuffledTeams[currentIndex] = randomTeam
-    shuffledTeams[randomIndex] = currentTeam
-  }
-
-  return shuffledTeams
 }
 
 export function runFairDraw(players: Player[], eligibleTeams: Team[]): TeamAssignment[] {
   const readiness = getDrawReadiness(players, eligibleTeams)
 
   if (!readiness.canRunDraw) {
-    throw new Error(readiness.reason)
+    return []
   }
 
-  const shuffledTeams = shuffleTeams(eligibleTeams)
-  const assignedAt = new Date().toISOString()
-  const drawId = `local-draw-${Date.now()}`
-  const assignments: TeamAssignment[] = []
+  const shuffledTeams = shuffle(eligibleTeams).slice(0, players.length)
+  const shuffledPlayers = shuffle(players)
 
-  players.forEach((player, playerIndex) => {
-    const startIndex = playerIndex * readiness.teamsPerPlayer
-    const endIndex = startIndex + readiness.teamsPerPlayer
-    const playerTeams = shuffledTeams.slice(startIndex, endIndex)
-
-    playerTeams.forEach((team) => {
-      assignments.push({
-        drawId,
-        playerId: player.id,
-        teamId: team.id,
-        assignedAt,
-      })
-    })
-  })
-
-  return assignments
+  return shuffledPlayers.map((player, index) => ({
+    drawId: `draft-${Date.now()}`,
+    playerId: player.id,
+    teamId: shuffledTeams[index].id,
+    assignedAt: new Date().toISOString(),
+  }))
 }
