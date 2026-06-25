@@ -49,11 +49,7 @@ function getIsAdminMode() {
   const searchParams = new URLSearchParams(window.location.search)
   const normalizedPathname = window.location.pathname.replace(/\/+$/, '')
 
-  return (
-    normalizedPathname === '/manage' ||
-    normalizedPathname.startsWith('/manage/') ||
-    searchParams.get('mode') === 'admin'
-  )
+  return normalizedPathname.startsWith('/admin') || searchParams.get('mode') === 'admin'
 }
 
 function App() {
@@ -279,7 +275,7 @@ function App() {
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <AppHeader milestone="Version 5.7" />
+        <AppHeader milestone="Version 5.7.3" />
         <AppNavigation />
 
         <section className="grid gap-4 md:grid-cols-4">
