@@ -47,8 +47,9 @@ const localStorageKeys = {
 
 function getIsAdminMode() {
   const searchParams = new URLSearchParams(window.location.search)
+  const normalizedPathname = window.location.pathname.replace(/\/+$/, '')
 
-  return window.location.pathname.startsWith('/admin') || searchParams.get('mode') === 'admin'
+  return normalizedPathname === '/admin' || searchParams.get('mode') === 'admin'
 }
 
 function App() {
