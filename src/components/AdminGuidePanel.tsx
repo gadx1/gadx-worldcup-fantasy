@@ -20,7 +20,7 @@ export function AdminGuidePanel() {
         <section className="rounded-2xl border border-slate-900/10 bg-slate-50 p-5">
           <h3 className="text-base font-semibold">1. Before sharing the public link</h3>
           <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-600">
-            <li>Open the protected admin URL: /admin*.</li>
+            <li>Open the protected admin URL.</li>
             <li>Confirm the tournament name and round dates.</li>
             <li>Confirm the 6 player names are correct.</li>
             <li>Confirm the eligible teams match the intended test round.</li>
@@ -67,7 +67,7 @@ export function AdminGuidePanel() {
           <li>Creating a second tournament is not available from the admin view yet.</li>
           <li>Player invitations are not managed inside the app yet.</li>
           <li>The public viewer is open, but admin writes should be further protected at API level in a later version.</li>
-          <li>The protected admin route temporarily uses /admin* because this is the known-working Cloudflare Access path for the current test version.</li>
+          <li>The protected admin route is temporarily using the known-working Cloudflare Access pattern for the current test version.</li>
         </ul>
       </div>
 

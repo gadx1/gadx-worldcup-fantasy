@@ -47,9 +47,24 @@ const localStorageKeys = {
 
 function getIsAdminMode() {
   const searchParams = new URLSearchParams(window.location.search)
-  const normalizedPathname = window.location.pathname.replace(/\/+$/, '')
 
-  return normalizedPathname.startsWith('/admin') || searchParams.get('mode') === 'admin'
+  const href = window.location.href.toLowerCase()
+  const pathname = window.location.pathname.toLowerCase()
+  const decodedPathname = decodeURIComponent(pathname)
+  const hash = window.location.hash.toLowerCase()
+
+  return (
+    href.includes('/admin') ||
+    href.includes('/manage') ||
+    pathname.includes('/admin') ||
+    pathname.includes('/manage') ||
+    decodedPathname.includes('/admin') ||
+    decodedPathname.includes('/manage') ||
+    hash.includes('admin') ||
+    hash.includes('manage') ||
+    searchParams.get('mode') === 'admin' ||
+    searchParams.get('admin') === 'true'
+  )
 }
 
 function App() {
@@ -275,7 +290,7 @@ function App() {
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <AppHeader milestone="Version 5.7.3" />
+        <AppHeader milestone="Version 5.7.4" />
         <AppNavigation />
 
         <section className="grid gap-4 md:grid-cols-4">
