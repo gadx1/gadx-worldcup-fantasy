@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { AdminGuidePanel } from './components/AdminGuidePanel'
 import { ApiStatusPanel } from './components/ApiStatusPanel'
 import { AppFooter } from './components/AppFooter'
 import { AppHeader } from './components/AppHeader'
@@ -47,7 +48,7 @@ const localStorageKeys = {
 function getIsAdminMode() {
   const searchParams = new URLSearchParams(window.location.search)
 
-  return searchParams.get('mode') === 'admin'
+  return window.location.pathname === '/admin' || searchParams.get('mode') === 'admin'
 }
 
 function App() {
@@ -273,7 +274,7 @@ function App() {
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <AppHeader milestone="Version 5.6" />
+        <AppHeader milestone="Version 5.7" />
         <AppNavigation />
 
         <section className="grid gap-4 md:grid-cols-4">
@@ -290,12 +291,12 @@ function App() {
                 Access Mode
               </p>
               <h2 className="mt-3 text-2xl font-semibold tracking-tight">
-                {isAdminMode ? 'Admin controls enabled.' : 'Viewer mode enabled.'}
+                {isAdminMode ? 'Admin controls enabled.' : 'Public viewer mode enabled.'}
               </h2>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
                 {isAdminMode
-                  ? 'You are using the admin URL. Tournament setup, player setup, match admin, and draw controls are available.'
-                  : 'This is the player-safe view. Tournament setup, player setup, match admin, and draw controls are hidden.'}
+                  ? 'You are using the protected admin route. Tournament setup, player setup, match admin, draw controls, and the admin guide are available.'
+                  : 'This is the public read-only view. Tournament setup, player setup, match admin, and draw controls are hidden.'}
               </p>
             </div>
 
@@ -304,7 +305,7 @@ function App() {
                 isAdminMode ? 'bg-slate-950 text-white' : 'bg-emerald-100 text-emerald-800'
               }`}
             >
-              {isAdminMode ? 'Admin' : 'Viewer'}
+              {isAdminMode ? 'Admin' : 'Public Viewer'}
             </span>
           </div>
         </article>
@@ -328,6 +329,8 @@ function App() {
         {isAdminMode && <ApiStatusPanel />}
 
         {isAdminMode && <DataSourcePanel />}
+
+        {isAdminMode && <AdminGuidePanel />}
 
         {!isDrawLocked && !isAdminMode && (
           <article className="rounded-3xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
@@ -419,7 +422,9 @@ function App() {
 
         <MatchResultsPanel matches={matches} teams={teams} scoringRules={scoringRules} />
 
-        {isAdminMode && <FeatureSections adminSections={adminSections} viewerSections={viewerSections} />}
+        {isAdminMode && (
+          <FeatureSections adminSections={adminSections} viewerSections={viewerSections} />
+        )}
 
         <AppFooter />
       </section>
