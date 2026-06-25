@@ -20,7 +20,7 @@ export function AdminGuidePanel() {
         <section className="rounded-2xl border border-slate-900/10 bg-slate-50 p-5">
           <h3 className="text-base font-semibold">1. Before sharing the link</h3>
           <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-600">
-            <li>Open the admin URL: /admin.</li>
+            <li>Open the admin URL: /manage.</li>
             <li>Confirm the tournament name and round dates.</li>
             <li>Confirm the 6 player names are correct.</li>
             <li>Confirm the eligible teams match the intended test round.</li>
@@ -79,7 +79,7 @@ export function AdminGuidePanel() {
           </div>
           <div>
             <span className="font-semibold">Admin view:</span>{' '}
-            https://gadx-worldcup-fantasy.pages.dev/admin
+            https://gadx-worldcup-fantasy.pages.dev/manage
           </div>
         </div>
       </div>

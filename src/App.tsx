@@ -49,7 +49,11 @@ function getIsAdminMode() {
   const searchParams = new URLSearchParams(window.location.search)
   const normalizedPathname = window.location.pathname.replace(/\/+$/, '')
 
-  return normalizedPathname === '/admin' || searchParams.get('mode') === 'admin'
+  return (
+    normalizedPathname === '/manage' ||
+    normalizedPathname.startsWith('/manage/') ||
+    searchParams.get('mode') === 'admin'
+  )
 }
 
 function App() {
