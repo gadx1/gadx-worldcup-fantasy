@@ -65,8 +65,6 @@ function useAdminAuth(): AdminAuthStatus {
     let isActive = true
 
     async function resolveAdmin() {
-      // If the user is on the admin route, trust the route immediately.
-      // Cloudflare Access already gated this path, so reaching it means admin.
       if (getIsAdminRoute()) {
         if (isActive) {
           setStatus('admin')
@@ -74,8 +72,6 @@ function useAdminAuth(): AdminAuthStatus {
         return
       }
 
-      // The user may have landed on "/" after the Access login redirect.
-      // Verify a real Access identity exists before deciding.
       try {
         const response = await fetch('/cdn-cgi/access/get-identity', {
           credentials: 'include',
@@ -87,9 +83,11 @@ function useAdminAuth(): AdminAuthStatus {
 
         if (response.ok) {
           const identity = await response.json()
+
           if (isActive) {
             setStatus(identity && identity.email ? 'admin' : 'public')
           }
+
           return
         }
 
@@ -114,6 +112,9 @@ function useAdminAuth(): AdminAuthStatus {
 function App() {
   const adminAuthStatus = useAdminAuth()
   const isAdminMode = adminAuthStatus === 'admin'
+
+  const [drawActionMessage, setDrawActionMessage] = useState<string | null>(null)
+  const [isSavingDraw, setIsSavingDraw] = useState(false)
 
   const backendGameData = useBackendGameData(activeTournamentId)
   const backendDraw = useBackendDraw(activeTournamentId)
@@ -148,8 +149,8 @@ function App() {
   const drawReadiness = getDrawReadiness(tournamentPlayers, eligibleTeams)
 
   const [draftAssignments, setDraftAssignments] = useState<TeamAssignment[]>([])
-  const [localLockedAssignments, setLocalLockedAssignments, resetLocalLockedAssignments] =
-    useLocalStorageState<TeamAssignment[]>(localStorageKeys.lockedAssignments, [])
+  const [localLockedAssignments, , resetLocalLockedAssignments] =
+  useLocalStorageState<TeamAssignment[]>(localStorageKeys.lockedAssignments, [])
 
   const lockedAssignments =
     isBackendDataReady && isBackendDrawReady ? backendDraw.assignments : localLockedAssignments
@@ -174,20 +175,62 @@ function App() {
   const completedMatchCount = matches.filter((match) => match.status === 'fulltime').length
 
   function handleRunDraw() {
-    if (!isAdminMode || !drawReadiness.canRunDraw) {
+    setDrawActionMessage(null)
+
+    if (!isAdminMode) {
+      setDrawActionMessage('Admin mode is required to run the draw.')
+      return
+    }
+
+    if (!drawReadiness.canRunDraw) {
+      setDrawActionMessage(drawReadiness.reason ?? 'The draw is not ready yet.')
       return
     }
 
     const assignments = runFairDraw(tournamentPlayers, eligibleTeams)
-    setDraftAssignments(assignments)
-  }
 
-  async function handleSaveAndLockDraw() {
-    if (!isAdminMode || draftAssignments.length === 0 || lockedAssignments.length > 0) {
+    if (assignments.length === 0) {
+      setDrawActionMessage(
+        'The draw did not generate assignments. Please check players and eligible teams.',
+      )
       return
     }
 
-    if (isBackendDataReady && isBackendDrawReady) {
+    setDraftAssignments(assignments)
+    setDrawActionMessage('Draft draw generated. Review it, then save and lock when ready.')
+  }
+
+  async function handleSaveAndLockDraw() {
+    setDrawActionMessage(null)
+
+    if (!isAdminMode) {
+      setDrawActionMessage('Admin mode is required to save the draw.')
+      return
+    }
+
+    if (draftAssignments.length === 0) {
+      setDrawActionMessage('Generate a draft draw before saving.')
+      return
+    }
+
+    if (lockedAssignments.length > 0) {
+      setDrawActionMessage('A locked draw already exists. Reset it before saving a new one.')
+      return
+    }
+
+    if (!isBackendDataReady) {
+      setDrawActionMessage('Backend game data is not ready. The draw cannot be saved to production yet.')
+      return
+    }
+
+    if (!isBackendDrawReady) {
+      setDrawActionMessage('Backend draw data is not ready. Refresh the page and try again.')
+      return
+    }
+
+    setIsSavingDraw(true)
+
+    try {
       await saveLockedDraw(activeTournament.id, {
         createdByUserId: activeUserId,
         assignments: draftAssignments.map((assignment) => ({
@@ -198,27 +241,46 @@ function App() {
 
       await backendDraw.reload()
       setDraftAssignments([])
-      return
+      setDrawActionMessage('Draw saved and locked successfully.')
+    } catch (error) {
+      setDrawActionMessage(
+        error instanceof Error
+          ? `Could not save the draw: ${error.message}`
+          : 'Could not save the draw because of an unknown error.',
+      )
+    } finally {
+      setIsSavingDraw(false)
     }
-
-    setLocalLockedAssignments(draftAssignments)
-    setDraftAssignments([])
   }
 
   async function handleResetLockedDraw() {
+    setDrawActionMessage(null)
+
     if (!isAdminMode) {
+      setDrawActionMessage('Admin mode is required to reset the draw.')
       return
     }
 
     if (isBackendDataReady && isBackendDrawReady) {
-      await deleteLockedDraw(activeTournament.id)
-      await backendDraw.reload()
-      setDraftAssignments([])
+      try {
+        await deleteLockedDraw(activeTournament.id)
+        await backendDraw.reload()
+        setDraftAssignments([])
+        setDrawActionMessage('Locked draw reset successfully.')
+      } catch (error) {
+        setDrawActionMessage(
+          error instanceof Error
+            ? `Could not reset the draw: ${error.message}`
+            : 'Could not reset the draw because of an unknown error.',
+        )
+      }
+
       return
     }
 
     resetLocalLockedAssignments()
     setDraftAssignments([])
+    setDrawActionMessage('Local locked draw reset successfully.')
   }
 
   async function handleUpdateTournament(updates: Partial<Tournament>) {
@@ -236,6 +298,7 @@ function App() {
       })
       await backendGameData.reload()
       setDraftAssignments([])
+      setDrawActionMessage(null)
       return
     }
 
@@ -246,6 +309,7 @@ function App() {
     }))
 
     setDraftAssignments([])
+    setDrawActionMessage(null)
   }
 
   function handleResetTournament() {
@@ -255,6 +319,7 @@ function App() {
 
     resetLocalTournament()
     setDraftAssignments([])
+    setDrawActionMessage(null)
   }
 
   async function handleUpdatePlayer(playerId: string, updates: Partial<Player>) {
@@ -271,6 +336,7 @@ function App() {
       })
       await backendGameData.reload()
       setDraftAssignments([])
+      setDrawActionMessage(null)
       return
     }
 
@@ -286,6 +352,7 @@ function App() {
     )
 
     setDraftAssignments([])
+    setDrawActionMessage(null)
   }
 
   function handleResetPlayers() {
@@ -295,6 +362,7 @@ function App() {
 
     resetPlayers()
     setDraftAssignments([])
+    setDrawActionMessage(null)
   }
 
   async function handleUpdateMatch(matchId: string, updates: Partial<Match>) {
@@ -345,7 +413,7 @@ function App() {
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <AppHeader milestone="Version 5.7.4" />
+        <AppHeader milestone="Version 5.7.5" />
         <AppNavigation />
 
         <section className="grid gap-4 md:grid-cols-4">
@@ -451,6 +519,12 @@ function App() {
               </div>
             )}
 
+            {drawActionMessage && (
+              <article className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm font-semibold leading-6 text-amber-950">
+                {drawActionMessage}
+              </article>
+            )}
+
             <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
               <EligibleTeamsPanel
                 eligibleTeams={eligibleTeams}
@@ -465,7 +539,7 @@ function App() {
                 lockedAssignments={lockedAssignments}
                 drawReadiness={drawReadiness}
                 onRunDraw={handleRunDraw}
-                onSaveAndLock={handleSaveAndLockDraw}
+                onSaveAndLock={isSavingDraw ? () => undefined : handleSaveAndLockDraw}
                 onResetLockedDraw={handleResetLockedDraw}
               />
             </section>
