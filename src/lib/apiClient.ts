@@ -1,4 +1,9 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8787'
+// Normalize the base URL so a trailing slash in VITE_API_BASE_URL (e.g.
+// "https://api.example.com/") does not produce a double slash like
+// "https://api.example.com//api/...", which some browsers (notably Safari/
+// WebKit) reject with a generic "Load failed" network error.
+const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8787'
+const API_BASE_URL = RAW_API_BASE_URL.replace(/\/+$/, '')
 
 export type ApiHealthResponse = {
   ok: boolean

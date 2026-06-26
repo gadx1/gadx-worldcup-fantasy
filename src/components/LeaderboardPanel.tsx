@@ -25,9 +25,13 @@ export function LeaderboardPanel({
         Points are calculated from completed match results using the active scoring rules.
       </p>
 
-      {/* overflow-x-auto enables horizontal scroll on mobile instead of truncating.
-          -webkit-overflow-scrolling adds momentum scroll on iOS. min-w on the table
-          forces the scroll container to overflow rather than squashing columns. */}
+      {/*
+        overflow-x-auto enables horizontal scrolling on mobile instead of clipping
+        the table (the previous overflow-hidden truncated columns with no way to
+        reach them). min-w-[640px] forces the table to overflow its container so
+        the scroll bar appears rather than the columns being squashed. The
+        webkit momentum-scroll utility gives a smooth scroll on iOS Safari.
+      */}
       <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-900/10 [-webkit-overflow-scrolling:touch]">
         <table className="w-full min-w-[640px] border-collapse bg-white text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-[0.18em] text-slate-500">
