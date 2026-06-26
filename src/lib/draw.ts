@@ -61,14 +61,14 @@ export function runFairDraw(players: Player[], eligibleTeams: Team[]): TeamAssig
     return []
   }
 
-  const shuffledTeams = shuffle(eligibleTeams).slice(0, players.length)
+  const drawId = `draft-${Date.now()}`
   const shuffledPlayers = shuffle(players)
+  const selectedTeams = shuffle(eligibleTeams).slice(0, players.length)
 
   return shuffledPlayers.map((player, index) => ({
-    drawId: `draft-${Date.now()}`,
+    drawId,
     playerId: player.id,
-    teamId: shuffledTeams[index].id,
+    teamId: selectedTeams[index].id,
     assignedAt: new Date().toISOString(),
   }))
 }
-
