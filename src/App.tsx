@@ -149,8 +149,8 @@ function App() {
   const drawReadiness = getDrawReadiness(tournamentPlayers, eligibleTeams)
 
   const [draftAssignments, setDraftAssignments] = useState<TeamAssignment[]>([])
-  const [localLockedAssignments, , resetLocalLockedAssignments] =
-  useLocalStorageState<TeamAssignment[]>(localStorageKeys.lockedAssignments, [])
+  const [localLockedAssignments, setLocalLockedAssignments, resetLocalLockedAssignments] =
+    useLocalStorageState<TeamAssignment[]>(localStorageKeys.lockedAssignments, [])
 
   const lockedAssignments =
     isBackendDataReady && isBackendDrawReady ? backendDraw.assignments : localLockedAssignments
@@ -218,39 +218,52 @@ function App() {
       return
     }
 
-    if (!isBackendDataReady) {
-      setDrawActionMessage('Backend game data is not ready. The draw cannot be saved to production yet.')
+    // Backend path: persist the locked draw to D1 through the Worker API.
+    if (isBackendDataReady && isBackendDrawReady) {
+      setIsSavingDraw(true)
+
+      try {
+        await saveLockedDraw(activeTournament.id, {
+          createdByUserId: activeUserId,
+          assignments: draftAssignments.map((assignment) => ({
+            playerId: assignment.playerId,
+            teamId: assignment.teamId,
+          })),
+        })
+
+        await backendDraw.reload()
+        setDraftAssignments([])
+        setDrawActionMessage('Draw saved and locked successfully.')
+      } catch (error) {
+        setDrawActionMessage(
+          error instanceof Error
+            ? `Could not save the draw: ${error.message}`
+            : 'Could not save the draw because of an unknown error.',
+        )
+      } finally {
+        setIsSavingDraw(false)
+      }
+
       return
     }
 
-    if (!isBackendDrawReady) {
-      setDrawActionMessage('Backend draw data is not ready. Refresh the page and try again.')
-      return
-    }
+    // Local fallback: the backend is not connected, so persist the locked draw
+    // to localStorage. This keeps the Save button functional and the locked
+    // draw visible after a page refresh during local/offline use.
+    const lockedAt = new Date().toISOString()
+    const localDrawId = `local_draw_${activeTournament.id}_${Date.now()}`
 
-    setIsSavingDraw(true)
+    setLocalLockedAssignments(
+      draftAssignments.map((assignment) => ({
+        drawId: localDrawId,
+        playerId: assignment.playerId,
+        teamId: assignment.teamId,
+        assignedAt: lockedAt,
+      })),
+    )
 
-    try {
-      await saveLockedDraw(activeTournament.id, {
-        createdByUserId: activeUserId,
-        assignments: draftAssignments.map((assignment) => ({
-          playerId: assignment.playerId,
-          teamId: assignment.teamId,
-        })),
-      })
-
-      await backendDraw.reload()
-      setDraftAssignments([])
-      setDrawActionMessage('Draw saved and locked successfully.')
-    } catch (error) {
-      setDrawActionMessage(
-        error instanceof Error
-          ? `Could not save the draw: ${error.message}`
-          : 'Could not save the draw because of an unknown error.',
-      )
-    } finally {
-      setIsSavingDraw(false)
-    }
+    setDraftAssignments([])
+    setDrawActionMessage('Draw saved and locked locally (backend not connected).')
   }
 
   async function handleResetLockedDraw() {
@@ -289,16 +302,24 @@ function App() {
     }
 
     if (isBackendDataReady) {
-      await updateTournament(activeTournament.id, {
-        name: updates.name,
-        roundName: updates.roundName,
-        roundStartDate: updates.roundStartDate,
-        roundEndDate: updates.roundEndDate,
-        resultsMode: updates.resultsMode,
-      })
-      await backendGameData.reload()
-      setDraftAssignments([])
-      setDrawActionMessage(null)
+      try {
+        await updateTournament(activeTournament.id, {
+          name: updates.name,
+          roundName: updates.roundName,
+          roundStartDate: updates.roundStartDate,
+          roundEndDate: updates.roundEndDate,
+          resultsMode: updates.resultsMode,
+        })
+        await backendGameData.reload()
+        setDraftAssignments([])
+        setDrawActionMessage(null)
+      } catch (error) {
+        setDrawActionMessage(
+          error instanceof Error
+            ? `Could not update the tournament: ${error.message}`
+            : 'Could not update the tournament because of an unknown error.',
+        )
+      }
       return
     }
 
@@ -328,15 +349,23 @@ function App() {
     }
 
     if (isBackendDataReady) {
-      await updatePlayer(playerId, {
-        firstName: updates.firstName,
-        lastName: updates.lastName,
-        displayName: updates.displayName,
-        avatarId: updates.avatarId,
-      })
-      await backendGameData.reload()
-      setDraftAssignments([])
-      setDrawActionMessage(null)
+      try {
+        await updatePlayer(playerId, {
+          firstName: updates.firstName,
+          lastName: updates.lastName,
+          displayName: updates.displayName,
+          avatarId: updates.avatarId,
+        })
+        await backendGameData.reload()
+        setDraftAssignments([])
+        setDrawActionMessage(null)
+      } catch (error) {
+        setDrawActionMessage(
+          error instanceof Error
+            ? `Could not update the player: ${error.message}`
+            : 'Could not update the player because of an unknown error.',
+        )
+      }
       return
     }
 
@@ -371,12 +400,20 @@ function App() {
     }
 
     if (isBackendDataReady) {
-      await updateMatch(matchId, {
-        status: updates.status,
-        homeScore: updates.homeScore,
-        awayScore: updates.awayScore,
-      })
-      await backendGameData.reload()
+      try {
+        await updateMatch(matchId, {
+          status: updates.status,
+          homeScore: updates.homeScore,
+          awayScore: updates.awayScore,
+        })
+        await backendGameData.reload()
+      } catch (error) {
+        setDrawActionMessage(
+          error instanceof Error
+            ? `Could not update the match: ${error.message}`
+            : 'Could not update the match because of an unknown error.',
+        )
+      }
       return
     }
 
