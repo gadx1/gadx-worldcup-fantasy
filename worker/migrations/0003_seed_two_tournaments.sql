@@ -25,7 +25,13 @@
 -- The original prototype tournament from migration 0002 is left intact.
 -- Players: the same six friends are registered in BOTH tournaments.
 
-PRAGMA foreign_keys = ON;
+-- Defer foreign-key checks until the end of the transaction. D1 enforces FKs
+-- strictly, and an INSERT OR REPLACE on a `teams` row that is still referenced
+-- by a match in another tournament (e.g. the original prototype tournament)
+-- would otherwise fail mid-script with "FOREIGN KEY constraint failed". With
+-- deferral, all the deletes and inserts are validated together at COMMIT, by
+-- which point every reference is consistent again.
+PRAGMA defer_foreign_keys = TRUE;
 
 -- ===========================================================================
 -- 0. CLEANUP — remove ALL prior data for these two tournaments.
@@ -57,7 +63,7 @@ DELETE FROM tournament_users
 -- ===========================================================================
 -- 1. TEAMS — every nation that plays in either tournament.
 -- ===========================================================================
-INSERT OR REPLACE INTO teams (
+INSERT OR IGNORE INTO teams (
   id, country_name, country_code, fifa_code, flag_emoji, confederation,
   tournament_status, is_active, created_at, updated_at
 )
