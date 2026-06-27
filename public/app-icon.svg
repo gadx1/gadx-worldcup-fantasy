@@ -1,0 +1,42 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- GADX World Cup Draw app icon.
+       Minimalist: deep pitch-green field, a single chalk-line circle evoking the
+       center circle of a pitch, a stylized lime ball, and the GADX wordmark. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#11533D"/>
+      <stop offset="1" stop-color="#0B3D2E"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded field. iOS masks to a squircle, but we round anyway for non-iOS. -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- Faint pitch center line + circle, the signature touch. -->
+  <line x1="256" y1="40" x2="256" y2="472" stroke="#C7F24D" stroke-width="3" opacity="0.16"/>
+  <circle cx="256" cy="200" r="92" fill="none" stroke="#C7F24D" stroke-width="3" opacity="0.16"/>
+
+  <!-- Stylized minimalist ball: a lime ring with a simple pentagon hint. -->
+  <g transform="translate(256 200)">
+    <circle r="74" fill="#C7F24D"/>
+    <circle r="74" fill="none" stroke="#0B3D2E" stroke-width="0" />
+    <!-- Pentagon panel -->
+    <path d="M0 -34 L32 -10 L20 28 L-20 28 L-32 -10 Z"
+          fill="#0B3D2E"/>
+    <!-- Three short seams radiating out, ball-like. -->
+    <line x1="0" y1="-34" x2="0" y2="-66" stroke="#0B3D2E" stroke-width="7" stroke-linecap="round"/>
+    <line x1="32" y1="-10" x2="60" y2="-22" stroke="#0B3D2E" stroke-width="7" stroke-linecap="round"/>
+    <line x1="20" y1="28" x2="40" y2="54" stroke="#0B3D2E" stroke-width="7" stroke-linecap="round"/>
+    <line x1="-20" y1="28" x2="-40" y2="54" stroke="#0B3D2E" stroke-width="7" stroke-linecap="round"/>
+    <line x1="-32" y1="-10" x2="-60" y2="-22" stroke="#0B3D2E" stroke-width="7" stroke-linecap="round"/>
+  </g>
+
+  <!-- GADX wordmark, condensed and bold, in lime. -->
+  <text x="256" y="392"
+        font-family="Arial Narrow, Arial, sans-serif"
+        font-size="104" font-weight="800" letter-spacing="6"
+        text-anchor="middle" fill="#C7F24D">GADX</text>
+
+  <!-- Thin lime baseline under the wordmark. -->
+  <rect x="176" y="418" width="160" height="6" rx="3" fill="#C7F24D" opacity="0.5"/>
+</svg>
