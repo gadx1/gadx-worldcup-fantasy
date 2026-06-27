@@ -473,7 +473,7 @@ async function getLockedDrawByTournamentId(env: Env, tournamentId: string) {
       ta.team_id AS teamId,
       t.country_name AS teamName,
       t.flag_emoji AS teamFlagEmoji,
-      ta.created_at AS createdAt
+      ta.assigned_at AS assignedAt
     FROM team_assignments ta
     INNER JOIN players p ON p.id = ta.player_id
     INNER JOIN teams t ON t.id = ta.team_id
@@ -550,10 +550,11 @@ async function saveLockedDraw(
         tournament_id,
         status,
         created_by_user_id,
+        locked_at,
         created_at,
         updated_at
       )
-      VALUES (?, ?, 'locked', ?, datetime('now'), datetime('now'))
+      VALUES (?, ?, 'locked', ?, datetime('now'), datetime('now'), datetime('now'))
       `,
     ).bind(drawId, tournamentId, createdByUserId),
   )
@@ -568,7 +569,7 @@ async function saveLockedDraw(
           tournament_id,
           player_id,
           team_id,
-          created_at
+          assigned_at
         )
         VALUES (?, ?, ?, ?, ?, datetime('now'))
         `,

@@ -13,6 +13,7 @@ import { MatchAdminPanel } from './components/MatchAdminPanel'
 import { MatchResultsPanel } from './components/MatchResultsPanel'
 import { MetricCard } from './components/MetricCard'
 import { PlayerSetupPanel } from './components/PlayerSetupPanel'
+import { TournamentSelector } from './components/TournamentSelector'
 import { TournamentSetupPanel } from './components/TournamentSetupPanel'
 import { adminSections, viewerSections } from './data/appSections'
 import { mockMatches } from './data/mockMatches'
@@ -22,6 +23,7 @@ import { mockTeams } from './data/mockTeams'
 import { mockTournaments } from './data/mockTournaments'
 import { useBackendDraw } from './hooks/useBackendDraw'
 import { useBackendGameData } from './hooks/useBackendGameData'
+import { useTournamentList } from './hooks/useTournamentList'
 import { useLocalStorageState } from './hooks/useLocalStorageState'
 import {
   deleteLockedDraw,
@@ -35,10 +37,11 @@ import { getEligibleTeams, getIneligibleTeams } from './lib/eligibility'
 import { calculateStandings } from './lib/scoring'
 import type { Match, Player, TeamAssignment, Tournament } from './types/domain'
 
-const activeTournamentId = 'tournament_dublin_friends'
+const defaultTournamentId = 'tournament_saturday_27'
 const activeUserId = 'user_admin'
 
 const localStorageKeys = {
+  activeTournamentId: 'gadx-worldcup-draw:active-tournament-id',
   lockedAssignments: 'gadx-worldcup-draw:locked-assignments',
   matches: 'gadx-worldcup-draw:matches',
   players: 'gadx-worldcup-draw:players',
@@ -113,6 +116,28 @@ function App() {
   const adminAuthStatus = useAdminAuth()
   const isAdminMode = adminAuthStatus === 'admin'
 
+  const tournamentList = useTournamentList()
+  const [activeTournamentId, setActiveTournamentId] = useLocalStorageState<string>(
+    localStorageKeys.activeTournamentId,
+    defaultTournamentId,
+  )
+
+  // If the persisted tournament id is not in the loaded list, fall back to the
+  // first available tournament so the app never points at a missing tournament.
+  useEffect(() => {
+    if (tournamentList.status !== 'ready' || tournamentList.tournaments.length === 0) {
+      return
+    }
+
+    const exists = tournamentList.tournaments.some(
+      (tournament) => tournament.id === activeTournamentId,
+    )
+
+    if (!exists) {
+      setActiveTournamentId(tournamentList.tournaments[0].id)
+    }
+  }, [tournamentList.status, tournamentList.tournaments, activeTournamentId, setActiveTournamentId])
+
   const [drawActionMessage, setDrawActionMessage] = useState<string | null>(null)
   const [isSavingDraw, setIsSavingDraw] = useState(false)
 
@@ -173,6 +198,16 @@ function App() {
   )
 
   const completedMatchCount = matches.filter((match) => match.status === 'fulltime').length
+
+  function handleSelectTournament(tournamentId: string) {
+    if (tournamentId === activeTournamentId) {
+      return
+    }
+
+    setActiveTournamentId(tournamentId)
+    setDraftAssignments([])
+    setDrawActionMessage(null)
+  }
 
   function handleRunDraw() {
     setDrawActionMessage(null)
@@ -452,6 +487,13 @@ function App() {
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
         <AppHeader milestone="Version 5.7.5" />
         <AppNavigation />
+
+        <TournamentSelector
+          tournaments={tournamentList.tournaments}
+          activeTournamentId={activeTournamentId}
+          isLoading={tournamentList.status === 'loading'}
+          onSelect={handleSelectTournament}
+        />
 
         <section className="grid gap-4 md:grid-cols-4">
           <MetricCard label="Tournament" value={activeTournament.name} />
