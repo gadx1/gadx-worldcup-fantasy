@@ -28,6 +28,33 @@
 PRAGMA foreign_keys = ON;
 
 -- ===========================================================================
+-- 0. CLEANUP — remove ALL prior data for these two tournaments.
+--    This is essential because an earlier version of this seed inserted
+--    different matches (with different ids). INSERT OR REPLACE only overwrites
+--    rows with the SAME id, so stale matches/teams from the old version would
+--    otherwise survive and pollute the team list. We delete in FK-safe order:
+--    assignments -> draws -> match_events -> matches -> players ->
+--    scoring_rules -> tournament_users, then re-insert everything fresh.
+-- ===========================================================================
+DELETE FROM team_assignments
+  WHERE tournament_id IN ('tournament_friday_26', 'tournament_saturday_27');
+DELETE FROM draws
+  WHERE tournament_id IN ('tournament_friday_26', 'tournament_saturday_27');
+DELETE FROM match_events
+  WHERE match_id IN (
+    SELECT id FROM matches
+    WHERE tournament_id IN ('tournament_friday_26', 'tournament_saturday_27')
+  );
+DELETE FROM matches
+  WHERE tournament_id IN ('tournament_friday_26', 'tournament_saturday_27');
+DELETE FROM players
+  WHERE tournament_id IN ('tournament_friday_26', 'tournament_saturday_27');
+DELETE FROM scoring_rules
+  WHERE tournament_id IN ('tournament_friday_26', 'tournament_saturday_27');
+DELETE FROM tournament_users
+  WHERE tournament_id IN ('tournament_friday_26', 'tournament_saturday_27');
+
+-- ===========================================================================
 -- 1. TEAMS — every nation that plays in either tournament.
 -- ===========================================================================
 INSERT OR REPLACE INTO teams (
