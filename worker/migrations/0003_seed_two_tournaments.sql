@@ -25,43 +25,28 @@
 -- The original prototype tournament from migration 0002 is left intact.
 -- Players: the same six friends are registered in BOTH tournaments.
 
--- Defer foreign-key checks until the end of the transaction. D1 enforces FKs
--- strictly, and an INSERT OR REPLACE on a `teams` row that is still referenced
--- by a match in another tournament (e.g. the original prototype tournament)
--- would otherwise fail mid-script with "FOREIGN KEY constraint failed". With
--- deferral, all the deletes and inserts are validated together at COMMIT, by
--- which point every reference is consistent again.
-PRAGMA defer_foreign_keys = TRUE;
+-- Foreign keys must be ON so that deleting a tournament cascades to its child
+-- rows (players, matches, draws, assignments, etc.).
+PRAGMA foreign_keys = ON;
 
 -- ===========================================================================
--- 0. CLEANUP — remove ALL prior data for these two tournaments.
---    This is essential because an earlier version of this seed inserted
---    different matches (with different ids). INSERT OR REPLACE only overwrites
---    rows with the SAME id, so stale matches/teams from the old version would
---    otherwise survive and pollute the team list. We delete in FK-safe order:
---    assignments -> draws -> match_events -> matches -> players ->
---    scoring_rules -> tournament_users, then re-insert everything fresh.
+-- 0. CLEANUP — remove the two tournaments and everything under them.
+--    Deleting the tournament row cascades (ON DELETE CASCADE) to players,
+--    matches, match_events, scoring_rules, draws, team_assignments and
+--    tournament_users for that tournament, so a single delete clears all stale
+--    data from any earlier version of this seed. We deliberately do NOT touch
+--    the `teams` table here: teams are shared reference data and are referenced
+--    by matches in the original prototype tournament, so deleting/replacing a
+--    team row could break those references. New teams are added with
+--    INSERT OR IGNORE below, which never deletes an existing row.
 -- ===========================================================================
-DELETE FROM team_assignments
-  WHERE tournament_id IN ('tournament_friday_26', 'tournament_saturday_27');
-DELETE FROM draws
-  WHERE tournament_id IN ('tournament_friday_26', 'tournament_saturday_27');
-DELETE FROM match_events
-  WHERE match_id IN (
-    SELECT id FROM matches
-    WHERE tournament_id IN ('tournament_friday_26', 'tournament_saturday_27')
-  );
-DELETE FROM matches
-  WHERE tournament_id IN ('tournament_friday_26', 'tournament_saturday_27');
-DELETE FROM players
-  WHERE tournament_id IN ('tournament_friday_26', 'tournament_saturday_27');
-DELETE FROM scoring_rules
-  WHERE tournament_id IN ('tournament_friday_26', 'tournament_saturday_27');
-DELETE FROM tournament_users
-  WHERE tournament_id IN ('tournament_friday_26', 'tournament_saturday_27');
+DELETE FROM tournaments
+  WHERE id IN ('tournament_friday_26', 'tournament_saturday_27');
 
 -- ===========================================================================
 -- 1. TEAMS — every nation that plays in either tournament.
+--    INSERT OR IGNORE: add any team that does not already exist, and leave
+--    existing teams (and their references) untouched.
 -- ===========================================================================
 INSERT OR IGNORE INTO teams (
   id, country_name, country_code, fifa_code, flag_emoji, confederation,
