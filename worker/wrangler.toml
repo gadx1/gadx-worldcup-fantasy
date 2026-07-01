@@ -4,9 +4,21 @@ compatibility_date = "2026-06-23"
 
 [vars]
 ENVIRONMENT = "production"
+# The survivor tournament id the scheduled sync updates. Override here if it changes.
+SURVIVOR_TOURNAMENT_ID = "tournament_wc_survivor"
+
+# Run the results sync every hour, on the hour.
+# (Cron is UTC. "0 * * * *" = top of every hour.)
+[triggers]
+crons = ["0 * * * *"]
 
 [[d1_databases]]
 binding = "DB"
 database_name = "gadx_worldcup_draw"
 database_id = "b37d2284-9007-4bfd-baa8-63e2016e9def"
 migrations_dir = "migrations"
+
+# NOTE: the football-data.org API key is a SECRET, not a var. Do not put it here.
+# Set it once with:
+#   npx wrangler secret put FOOTBALL_DATA_API_KEY
+# and paste the token when prompted.

@@ -1,6 +1,10 @@
+import { runScheduledSync } from './scheduledSync'
+
 export interface Env {
   DB: D1Database
   ENVIRONMENT?: string
+  FOOTBALL_DATA_API_KEY?: string
+  SURVIVOR_TOURNAMENT_ID?: string
 }
 
 const allowedOrigins = new Set([
@@ -757,6 +761,11 @@ export default {
         })
       }
 
+      if (request.method === 'POST' && pathname === '/api/admin/sync-now') {
+        const summary = await runScheduledSync(env)
+        return jsonResponse(request, { ok: true, summary })
+      }
+
       if (request.method === 'POST' && lockedDrawMatch) {
         const body = await parseJsonBody(request)
 
@@ -806,5 +815,10 @@ export default {
         500,
       )
     }
+  },
+
+  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    // Run the hourly results sync in the background.
+    ctx.waitUntil(runScheduledSync(env))
   },
 }
