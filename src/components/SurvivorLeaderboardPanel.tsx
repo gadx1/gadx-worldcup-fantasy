@@ -54,22 +54,22 @@ export function SurvivorLeaderboardPanel({
   standings,
 }: SurvivorLeaderboardPanelProps) {
   return (
-    <article className="rounded-3xl border border-[var(--pitch-900)]/10 bg-white/85 p-6 shadow-sm sm:p-8">
-      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--pitch-700)]">
+    <article className="rounded-3xl border border-pitch-900/10 bg-white/85 p-6 shadow-sm sm:p-8">
+      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-pitch-700">
         Survivor Standings
       </p>
       <div className="chalk-rule mt-3" />
-      <h2 className="font-display mt-4 text-2xl font-bold uppercase tracking-tight text-[var(--ink-900)] sm:text-3xl">
+      <h2 className="font-display mt-4 text-2xl font-bold uppercase tracking-tight text-ink-900 sm:text-3xl">
         Who's still alive
       </h2>
-      <p className="mt-3 max-w-2xl leading-7 text-[var(--ink-600)]">
+      <p className="mt-3 max-w-2xl leading-7 text-ink-600">
         Points come from each player's teams in the knockout stage, counted from July 1 onward.
         A player is eliminated once every team they own has lost.
       </p>
 
-      <div className="mt-6 overflow-x-auto rounded-2xl border border-[var(--pitch-900)]/10 [-webkit-overflow-scrolling:touch]">
+      <div className="mt-6 overflow-x-auto rounded-2xl border border-pitch-900/10 [-webkit-overflow-scrolling:touch]">
         <table className="w-full min-w-[720px] border-collapse bg-white text-left text-sm">
-          <thead className="bg-[var(--pitch-900)] text-xs uppercase tracking-[0.18em] text-[var(--lime-300)]">
+          <thead className="bg-pitch-900 text-xs uppercase tracking-[0.18em] text-lime-300">
             <tr>
               <th className="px-4 py-4">Rank</th>
               <th className="px-4 py-4">Player</th>
@@ -78,7 +78,7 @@ export function SurvivorLeaderboardPanel({
               <th className="px-4 py-4 text-right">Points</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[var(--pitch-900)]/10">
+          <tbody className="divide-y divide-pitch-900/10">
             {standings.map((standing) => {
               const player = players.find((item) => item.id === standing.playerId)
               const isLeader = standing.rank === 1
@@ -89,15 +89,15 @@ export function SurvivorLeaderboardPanel({
                     <span
                       className={`font-display inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
                         isLeader
-                          ? 'bg-[var(--lime-400)] text-[var(--pitch-900)]'
-                          : 'bg-[var(--bone-100)] text-[var(--ink-900)]'
+                          ? 'bg-lime-400 text-pitch-900'
+                          : 'bg-bone-100 text-ink-900'
                       }`}
                     >
                       {standing.rank}
                     </span>
                   </td>
                   <td className="px-4 py-4">
-                    <p className="font-semibold text-[var(--ink-900)]">{player?.displayName}</p>
+                    <p className="font-semibold text-ink-900">{player?.displayName}</p>
                   </td>
                   <td className="px-4 py-4">
                     <StatusDot state={standing.state} />
@@ -113,7 +113,7 @@ export function SurvivorLeaderboardPanel({
                             key={teamScore.teamId}
                             className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${
                               isTeamAlive
-                                ? 'bg-[var(--pitch-700)]/10 text-[var(--pitch-800)]'
+                                ? 'bg-pitch-700/10 text-pitch-800'
                                 : 'bg-red-50 text-red-700 line-through decoration-red-400'
                             }`}
                             title={
@@ -129,7 +129,7 @@ export function SurvivorLeaderboardPanel({
                     </div>
                   </td>
                   <td className="px-4 py-4 text-right">
-                    <span className="font-display text-lg font-bold text-[var(--ink-900)]">
+                    <span className="font-display text-lg font-bold text-ink-900">
                       {standing.totalPoints}
                     </span>
                   </td>

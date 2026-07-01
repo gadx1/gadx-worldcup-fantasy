@@ -35,11 +35,16 @@ function App() {
   const matches = backendGameData.data.matches
   const scoringRules = backendGameData.data.scoringRules
 
-  // Teams eligible for the draw: the ones seeded into this tournament that are
-  // still active/qualified (the 16 Round-of-16 teams once they are seeded).
-  const eligibleTeams = teams.filter(
-    (team) => team.tournamentStatus === 'active' || team.qualificationStatus === 'qualified',
+  // Teams eligible for the draw: the `teams` table is GLOBAL reference data
+  // shared across every tournament (it has no tournament_id column), so a
+  // global status filter like `qualified`/`active` picks up teams left over
+  // from other tournaments too. The correct scope is "teams that actually
+  // have a fixture in THIS tournament" — matches is already scoped to
+  // survivorTournamentId, so deriving eligibility from it is exact.
+  const teamIdsInSurvivorMatches = new Set(
+    matches.flatMap((match) => [match.homeTeamId, match.awayTeamId]),
   )
+  const eligibleTeams = teams.filter((team) => teamIdsInSurvivorMatches.has(team.id))
 
   const lockedAssignments = backendDraw.assignments
   const isDrawLocked = lockedAssignments.length > 0
@@ -186,7 +191,7 @@ function App() {
   if (adminAuthStatus === 'checking') {
     return (
       <main className="flex min-h-screen items-center justify-center px-6 py-6 text-slate-950">
-        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[var(--pitch-700)]">
+        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-pitch-700">
           Loading…
         </p>
       </main>
@@ -197,9 +202,9 @@ function App() {
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
         <AppHeader milestone="World Cup Survivor" />
-        <AppNavigation />
+        <AppNavigation isAdminMode={isAdminMode} />
 
-        <section className="grid gap-4 md:grid-cols-4">
+        <section id="overview" className="grid gap-4 md:grid-cols-4">
           <MetricCard label="Tournament" value={tournament?.name ?? 'World Cup Survivor'} />
           <MetricCard label="Players" value={players.length} />
           <MetricCard label="Still Alive" value={`${alivePlayers} / ${players.length}`} />
@@ -213,16 +218,16 @@ function App() {
           </div>
         )}
 
-        <article className="rounded-3xl border border-[var(--pitch-900)]/10 bg-white/85 p-6 shadow-sm sm:p-8">
+        <article className="rounded-3xl border border-pitch-900/10 bg-white/85 p-6 shadow-sm sm:p-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--pitch-700)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-pitch-700">
                 Access Mode
               </p>
-              <h2 className="font-display mt-3 text-2xl font-bold uppercase tracking-tight text-[var(--ink-900)]">
+              <h2 className="font-display mt-3 text-2xl font-bold uppercase tracking-tight text-ink-900">
                 {isAdminMode ? 'Admin controls enabled' : 'Public viewer mode'}
               </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--ink-600)]">
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-ink-600">
                 {isAdminMode
                   ? 'Run the draw, lock team assignments, and record knockout results below.'
                   : 'Read-only view of the survivor standings and bracket.'}
@@ -230,7 +235,7 @@ function App() {
             </div>
             <span
               className={`w-fit rounded-full px-4 py-2 text-sm font-semibold ${
-                isAdminMode ? 'bg-[var(--pitch-900)] text-white' : 'bg-emerald-100 text-emerald-800'
+                isAdminMode ? 'bg-pitch-900 text-white' : 'bg-emerald-100 text-emerald-800'
               }`}
             >
               {isAdminMode ? 'Admin' : 'Public Viewer'}
@@ -240,15 +245,15 @@ function App() {
 
         {/* Draw controls (admin only) */}
         {isAdminMode && (
-          <article className="rounded-3xl border border-[var(--pitch-900)]/10 bg-white/85 p-6 shadow-sm sm:p-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--pitch-700)]">
+          <article id="draw-control" className="rounded-3xl border border-pitch-900/10 bg-white/85 p-6 shadow-sm sm:p-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-pitch-700">
               Draw Control
             </p>
             <div className="chalk-rule mt-3" />
-            <h2 className="font-display mt-4 text-2xl font-bold uppercase tracking-tight text-[var(--ink-900)]">
+            <h2 className="font-display mt-4 text-2xl font-bold uppercase tracking-tight text-ink-900">
               Assign teams to players
             </h2>
-            <p className="mt-3 max-w-2xl leading-7 text-[var(--ink-600)]">
+            <p className="mt-3 max-w-2xl leading-7 text-ink-600">
               Each player receives {teamsPerPlayer} teams, drawn together. Needs exactly{' '}
               {players.length * teamsPerPlayer} eligible teams ({players.length} players ×{' '}
               {teamsPerPlayer}). Currently {eligibleTeams.length} eligible.
@@ -265,7 +270,7 @@ function App() {
                 type="button"
                 onClick={handleRunDraw}
                 disabled={isDrawLocked}
-                className="rounded-full bg-[var(--pitch-900)] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--pitch-800)] disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-full bg-pitch-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-pitch-800 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Run Draw
               </button>
@@ -273,7 +278,7 @@ function App() {
                 type="button"
                 onClick={isSavingDraw ? undefined : handleSaveAndLockDraw}
                 disabled={draftAssignments.length === 0 || isDrawLocked || isSavingDraw}
-                className="rounded-full bg-[var(--lime-400)] px-5 py-3 text-sm font-bold uppercase tracking-wide text-[var(--pitch-900)] shadow-sm transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-full bg-lime-400 px-5 py-3 text-sm font-bold uppercase tracking-wide text-pitch-900 shadow-sm transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {isSavingDraw ? 'Saving…' : 'Save & Lock'}
               </button>
@@ -281,13 +286,13 @@ function App() {
                 type="button"
                 onClick={handleResetLockedDraw}
                 disabled={!isDrawLocked}
-                className="rounded-full border border-[var(--pitch-900)]/15 bg-white px-5 py-3 text-sm font-semibold text-[var(--ink-900)] shadow-sm transition hover:border-[var(--pitch-700)] disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-full border border-pitch-900/15 bg-white px-5 py-3 text-sm font-semibold text-ink-900 shadow-sm transition hover:border-pitch-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Reset Draw
               </button>
             </div>
 
-            <p className="mt-4 text-xs uppercase tracking-[0.18em] text-[var(--ink-600)]">
+            <p className="mt-4 text-xs uppercase tracking-[0.18em] text-ink-600">
               {isDrawLocked
                 ? 'Draw is locked.'
                 : draftAssignments.length > 0
@@ -298,28 +303,58 @@ function App() {
         )}
 
         {/* Standings table */}
-        <SurvivorLeaderboardPanel players={players} teams={teams} standings={standings} />
+        <div id="standings" className="scroll-mt-6">
+          <SurvivorLeaderboardPanel players={players} teams={teams} standings={standings} />
+        </div>
 
         {/* Bracket */}
-        <SurvivorBracketPanel
-          players={players}
-          teams={teams}
-          matches={matches}
-          assignments={activeAssignments}
-        />
+        <div id="bracket" className="scroll-mt-6">
+          <SurvivorBracketPanel
+            players={players}
+            teams={teams}
+            matches={matches}
+            assignments={activeAssignments}
+          />
+        </div>
 
         {/* Match admin (admin only) */}
         {isAdminMode && (
-          <MatchAdminPanel
-            matches={matches}
-            teams={teams}
-            isReadOnly={false}
-            statusLabel={undefined}
-            readOnlyReason={undefined}
-            onUpdateMatch={handleUpdateMatch}
-            onResetMatches={handleResetMatches}
-          />
+          <div id="match-admin" className="scroll-mt-6">
+            <MatchAdminPanel
+              matches={matches}
+              teams={teams}
+              isReadOnly={false}
+              statusLabel={undefined}
+              readOnlyReason={undefined}
+              onUpdateMatch={handleUpdateMatch}
+              onResetMatches={handleResetMatches}
+            />
+          </div>
         )}
+
+        {/* Rules */}
+        <article
+          id="rules"
+          className="scroll-mt-6 rounded-3xl border border-pitch-900/10 bg-white/85 p-6 shadow-sm sm:p-8"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-pitch-700">Rules</p>
+          <div className="chalk-rule mt-3" />
+          <h2 className="font-display mt-4 text-2xl font-bold uppercase tracking-tight text-ink-900">
+            How the survivor pool works
+          </h2>
+          <ul className="mt-4 max-w-2xl list-disc space-y-2 pl-5 text-sm leading-6 text-ink-600">
+            <li>
+              Each of the 8 players is drawn {teamsPerPlayer} Round-of-16 teams, once, for the whole
+              knockout stage.
+            </li>
+            <li>Points count from July 1 onward: 3 for a win, 1 for a draw, +1 per goal, +1 clean sheet.</li>
+            <li>
+              A player stays <strong>Live</strong> while at least one of their teams is still in the
+              tournament, and is marked <strong>Out</strong> once both are eliminated.
+            </li>
+            <li>Standings are ranked by total points; eliminated players keep the points they earned.</li>
+          </ul>
+        </article>
 
         <AppFooter />
       </section>
