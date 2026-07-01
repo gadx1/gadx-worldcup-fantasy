@@ -1,213 +1,68 @@
-import { useEffect, useState } from 'react'
-import { AdminGuidePanel } from './components/AdminGuidePanel'
-import { ApiStatusPanel } from './components/ApiStatusPanel'
+import { useState } from 'react'
 import { AppFooter } from './components/AppFooter'
 import { AppHeader } from './components/AppHeader'
 import { AppNavigation } from './components/AppNavigation'
-import { DataSourcePanel } from './components/DataSourcePanel'
-import { DrawControlPanel } from './components/DrawControlPanel'
-import { EligibleTeamsPanel } from './components/EligibleTeamsPanel'
-import { FeatureSections } from './components/FeatureSections'
-import { LeaderboardPanel } from './components/LeaderboardPanel'
 import { MatchAdminPanel } from './components/MatchAdminPanel'
-import { MatchResultsPanel } from './components/MatchResultsPanel'
 import { MetricCard } from './components/MetricCard'
-import { PlayerSetupPanel } from './components/PlayerSetupPanel'
-import { TournamentSelector } from './components/TournamentSelector'
-import { TournamentSetupPanel } from './components/TournamentSetupPanel'
-import { adminSections, viewerSections } from './data/appSections'
-import { mockMatches } from './data/mockMatches'
-import { mockPlayers } from './data/mockPlayers'
-import { mockScoringRules } from './data/mockScoringRules'
-import { mockTeams } from './data/mockTeams'
-import { mockTournaments } from './data/mockTournaments'
+import { SurvivorBracketPanel } from './components/SurvivorBracketPanel'
+import { SurvivorLeaderboardPanel } from './components/SurvivorLeaderboardPanel'
+import { useAdminAuth } from './hooks/useAdminAuth'
 import { useBackendDraw } from './hooks/useBackendDraw'
 import { useBackendGameData } from './hooks/useBackendGameData'
-import { useTournamentList } from './hooks/useTournamentList'
-import { useLocalStorageState } from './hooks/useLocalStorageState'
-import {
-  deleteLockedDraw,
-  saveLockedDraw,
-  updateMatch,
-  updatePlayer,
-  updateTournament,
-} from './lib/apiClient'
-import { getDrawReadiness, runFairDraw } from './lib/draw'
-import { getEligibleTeams, getIneligibleTeams } from './lib/eligibility'
-import { calculateStandings } from './lib/scoring'
-import type { Match, Player, TeamAssignment, Tournament } from './types/domain'
+import { deleteLockedDraw, saveLockedDraw, updateMatch } from './lib/apiClient'
+import { getSurvivorDrawReadiness, runSurvivorDraw } from './lib/survivorDraw'
+import { calculateSurvivorStandings } from './lib/survivorScoring'
+import type { Match, TeamAssignment } from './types/domain'
 
-const defaultTournamentId = 'tournament_saturday_27'
+const survivorTournamentId = 'tournament_wc_survivor'
 const activeUserId = 'user_admin'
-
-const localStorageKeys = {
-  activeTournamentId: 'gadx-worldcup-draw:active-tournament-id',
-  lockedAssignments: 'gadx-worldcup-draw:locked-assignments',
-  matches: 'gadx-worldcup-draw:matches',
-  players: 'gadx-worldcup-draw:players',
-  tournament: 'gadx-worldcup-draw:tournament',
-}
-
-function getIsAdminRoute() {
-  const pathname = decodeURIComponent(window.location.pathname.toLowerCase())
-
-  return (
-    pathname === '/admin' ||
-    pathname.startsWith('/admin/') ||
-    pathname === '/manage' ||
-    pathname.startsWith('/manage/')
-  )
-}
-
-type AdminAuthStatus = 'checking' | 'admin' | 'public'
-
-function useAdminAuth(): AdminAuthStatus {
-  const [status, setStatus] = useState<AdminAuthStatus>('checking')
-
-  useEffect(() => {
-    let isActive = true
-
-    async function resolveAdmin() {
-      if (getIsAdminRoute()) {
-        if (isActive) {
-          setStatus('admin')
-        }
-        return
-      }
-
-      try {
-        const response = await fetch('/cdn-cgi/access/get-identity', {
-          credentials: 'include',
-        })
-
-        if (!isActive) {
-          return
-        }
-
-        if (response.ok) {
-          const identity = await response.json()
-
-          if (isActive) {
-            setStatus(identity && identity.email ? 'admin' : 'public')
-          }
-
-          return
-        }
-
-        setStatus('public')
-      } catch {
-        if (isActive) {
-          setStatus('public')
-        }
-      }
-    }
-
-    resolveAdmin()
-
-    return () => {
-      isActive = false
-    }
-  }, [])
-
-  return status
-}
+const teamsPerPlayer = 2
 
 function App() {
   const adminAuthStatus = useAdminAuth()
   const isAdminMode = adminAuthStatus === 'admin'
 
-  const tournamentList = useTournamentList()
-  const [activeTournamentId, setActiveTournamentId] = useLocalStorageState<string>(
-    localStorageKeys.activeTournamentId,
-    defaultTournamentId,
-  )
-
-  // If the persisted tournament id is not in the loaded list, fall back to the
-  // first available tournament so the app never points at a missing tournament.
-  useEffect(() => {
-    if (tournamentList.status !== 'ready' || tournamentList.tournaments.length === 0) {
-      return
-    }
-
-    const exists = tournamentList.tournaments.some(
-      (tournament) => tournament.id === activeTournamentId,
-    )
-
-    if (!exists) {
-      setActiveTournamentId(tournamentList.tournaments[0].id)
-    }
-  }, [tournamentList.status, tournamentList.tournaments, activeTournamentId, setActiveTournamentId])
+  const backendGameData = useBackendGameData(survivorTournamentId)
+  const backendDraw = useBackendDraw(survivorTournamentId)
 
   const [drawActionMessage, setDrawActionMessage] = useState<string | null>(null)
   const [isSavingDraw, setIsSavingDraw] = useState(false)
-
-  const backendGameData = useBackendGameData(activeTournamentId)
-  const backendDraw = useBackendDraw(activeTournamentId)
-  const isBackendDataReady = backendGameData.isBackendDataReady
-  const isBackendDrawReady = backendDraw.status === 'ready'
-
-  const [localTournament, setLocalTournament, resetLocalTournament] =
-    useLocalStorageState<Tournament>(localStorageKeys.tournament, mockTournaments[0])
-
-  const [localPlayers, setLocalPlayers, resetPlayers] = useLocalStorageState<Player[]>(
-    localStorageKeys.players,
-    mockPlayers,
-  )
-
-  const [localMatches, setLocalMatches, resetMatches] = useLocalStorageState<Match[]>(
-    localStorageKeys.matches,
-    mockMatches,
-  )
-
-  const activeTournament = backendGameData.data.tournament ?? localTournament
-  const players = isBackendDataReady ? backendGameData.data.players : localPlayers
-  const matches = isBackendDataReady ? backendGameData.data.matches : localMatches
-  const teams = isBackendDataReady ? backendGameData.data.teams : mockTeams
-  const scoringRules =
-    isBackendDataReady && backendGameData.data.scoringRules
-      ? backendGameData.data.scoringRules
-      : mockScoringRules
-
-  const tournamentPlayers = players.filter((player) => player.tournamentId === activeTournament.id)
-  const eligibleTeams = getEligibleTeams(teams, matches, activeTournament)
-  const ineligibleTeams = getIneligibleTeams(teams, matches, activeTournament)
-  const drawReadiness = getDrawReadiness(tournamentPlayers, eligibleTeams)
-
   const [draftAssignments, setDraftAssignments] = useState<TeamAssignment[]>([])
-  const [localLockedAssignments, setLocalLockedAssignments, resetLocalLockedAssignments] =
-    useLocalStorageState<TeamAssignment[]>(localStorageKeys.lockedAssignments, [])
 
-  const lockedAssignments =
-    isBackendDataReady && isBackendDrawReady ? backendDraw.assignments : localLockedAssignments
+  const tournament = backendGameData.data.tournament
+  const players = backendGameData.data.players
+  const teams = backendGameData.data.teams
+  const matches = backendGameData.data.matches
+  const scoringRules = backendGameData.data.scoringRules
 
-  const isDrawLocked = lockedAssignments.length > 0
-
-  const activeAssignments =
-    lockedAssignments.length > 0
-      ? lockedAssignments
-      : draftAssignments.length > 0
-        ? draftAssignments
-        : []
-
-  const standings = calculateStandings(
-    tournamentPlayers,
-    activeAssignments,
-    matches,
-    scoringRules,
-    activeTournament.id,
+  // Teams eligible for the draw: the ones seeded into this tournament that are
+  // still active/qualified (the 16 Round-of-16 teams once they are seeded).
+  const eligibleTeams = teams.filter(
+    (team) => team.tournamentStatus === 'active' || team.qualificationStatus === 'qualified',
   )
 
-  const completedMatchCount = matches.filter((match) => match.status === 'fulltime').length
+  const lockedAssignments = backendDraw.assignments
+  const isDrawLocked = lockedAssignments.length > 0
+  const activeAssignments = isDrawLocked ? lockedAssignments : draftAssignments
 
-  function handleSelectTournament(tournamentId: string) {
-    if (tournamentId === activeTournamentId) {
-      return
-    }
+  const cutoffUtc = tournament?.roundStartDate ?? '2026-07-01T00:00:00.000Z'
 
-    setActiveTournamentId(tournamentId)
-    setDraftAssignments([])
-    setDrawActionMessage(null)
-  }
+  const standings =
+    players.length > 0 && scoringRules
+      ? calculateSurvivorStandings(
+          players,
+          activeAssignments,
+          matches,
+          scoringRules,
+          survivorTournamentId,
+          cutoffUtc,
+        )
+      : []
+
+  const drawReadiness = getSurvivorDrawReadiness(players, eligibleTeams, teamsPerPlayer)
+
+  const alivePlayers = standings.filter((standing) => standing.state === 'alive').length
+  const completedMatches = matches.filter((match) => match.status === 'fulltime').length
 
   function handleRunDraw() {
     setDrawActionMessage(null)
@@ -217,22 +72,24 @@ function App() {
       return
     }
 
+    if (isDrawLocked) {
+      setDrawActionMessage('A draw is already locked. Reset it before running a new one.')
+      return
+    }
+
     if (!drawReadiness.canRunDraw) {
       setDrawActionMessage(drawReadiness.reason ?? 'The draw is not ready yet.')
       return
     }
 
-    const assignments = runFairDraw(tournamentPlayers, eligibleTeams)
-
+    const assignments = runSurvivorDraw(players, eligibleTeams, teamsPerPlayer)
     if (assignments.length === 0) {
-      setDrawActionMessage(
-        'The draw did not generate assignments. Please check players and eligible teams.',
-      )
+      setDrawActionMessage('The draw did not produce assignments. Check players and teams.')
       return
     }
 
     setDraftAssignments(assignments)
-    setDrawActionMessage('Draft draw generated. Review it, then save and lock when ready.')
+    setDrawActionMessage('Draft draw generated. Review it below, then save & lock when ready.')
   }
 
   async function handleSaveAndLockDraw() {
@@ -248,57 +105,34 @@ function App() {
       return
     }
 
-    if (lockedAssignments.length > 0) {
+    if (isDrawLocked) {
       setDrawActionMessage('A locked draw already exists. Reset it before saving a new one.')
       return
     }
 
-    // Backend path: persist the locked draw to D1 through the Worker API.
-    if (isBackendDataReady && isBackendDrawReady) {
-      setIsSavingDraw(true)
+    setIsSavingDraw(true)
 
-      try {
-        await saveLockedDraw(activeTournament.id, {
-          createdByUserId: activeUserId,
-          assignments: draftAssignments.map((assignment) => ({
-            playerId: assignment.playerId,
-            teamId: assignment.teamId,
-          })),
-        })
+    try {
+      await saveLockedDraw(survivorTournamentId, {
+        createdByUserId: activeUserId,
+        assignments: draftAssignments.map((assignment) => ({
+          playerId: assignment.playerId,
+          teamId: assignment.teamId,
+        })),
+      })
 
-        await backendDraw.reload()
-        setDraftAssignments([])
-        setDrawActionMessage('Draw saved and locked successfully.')
-      } catch (error) {
-        setDrawActionMessage(
-          error instanceof Error
-            ? `Could not save the draw: ${error.message}`
-            : 'Could not save the draw because of an unknown error.',
-        )
-      } finally {
-        setIsSavingDraw(false)
-      }
-
-      return
+      await backendDraw.reload()
+      setDraftAssignments([])
+      setDrawActionMessage('Draw saved and locked successfully.')
+    } catch (error) {
+      setDrawActionMessage(
+        error instanceof Error
+          ? `Could not save the draw: ${error.message}`
+          : 'Could not save the draw because of an unknown error.',
+      )
+    } finally {
+      setIsSavingDraw(false)
     }
-
-    // Local fallback: the backend is not connected, so persist the locked draw
-    // to localStorage. This keeps the Save button functional and the locked
-    // draw visible after a page refresh during local/offline use.
-    const lockedAt = new Date().toISOString()
-    const localDrawId = `local_draw_${activeTournament.id}_${Date.now()}`
-
-    setLocalLockedAssignments(
-      draftAssignments.map((assignment) => ({
-        drawId: localDrawId,
-        playerId: assignment.playerId,
-        teamId: assignment.teamId,
-        assignedAt: lockedAt,
-      })),
-    )
-
-    setDraftAssignments([])
-    setDrawActionMessage('Draw saved and locked locally (backend not connected).')
   }
 
   async function handleResetLockedDraw() {
@@ -309,124 +143,18 @@ function App() {
       return
     }
 
-    if (isBackendDataReady && isBackendDrawReady) {
-      try {
-        await deleteLockedDraw(activeTournament.id)
-        await backendDraw.reload()
-        setDraftAssignments([])
-        setDrawActionMessage('Locked draw reset successfully.')
-      } catch (error) {
-        setDrawActionMessage(
-          error instanceof Error
-            ? `Could not reset the draw: ${error.message}`
-            : 'Could not reset the draw because of an unknown error.',
-        )
-      }
-
-      return
+    try {
+      await deleteLockedDraw(survivorTournamentId)
+      await backendDraw.reload()
+      setDraftAssignments([])
+      setDrawActionMessage('Locked draw reset successfully.')
+    } catch (error) {
+      setDrawActionMessage(
+        error instanceof Error
+          ? `Could not reset the draw: ${error.message}`
+          : 'Could not reset the draw because of an unknown error.',
+      )
     }
-
-    resetLocalLockedAssignments()
-    setDraftAssignments([])
-    setDrawActionMessage('Local locked draw reset successfully.')
-  }
-
-  async function handleUpdateTournament(updates: Partial<Tournament>) {
-    if (!isAdminMode || isDrawLocked) {
-      return
-    }
-
-    if (isBackendDataReady) {
-      try {
-        await updateTournament(activeTournament.id, {
-          name: updates.name,
-          roundName: updates.roundName,
-          roundStartDate: updates.roundStartDate,
-          roundEndDate: updates.roundEndDate,
-          resultsMode: updates.resultsMode,
-        })
-        await backendGameData.reload()
-        setDraftAssignments([])
-        setDrawActionMessage(null)
-      } catch (error) {
-        setDrawActionMessage(
-          error instanceof Error
-            ? `Could not update the tournament: ${error.message}`
-            : 'Could not update the tournament because of an unknown error.',
-        )
-      }
-      return
-    }
-
-    setLocalTournament((currentTournament) => ({
-      ...currentTournament,
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    }))
-
-    setDraftAssignments([])
-    setDrawActionMessage(null)
-  }
-
-  function handleResetTournament() {
-    if (!isAdminMode || isDrawLocked || isBackendDataReady) {
-      return
-    }
-
-    resetLocalTournament()
-    setDraftAssignments([])
-    setDrawActionMessage(null)
-  }
-
-  async function handleUpdatePlayer(playerId: string, updates: Partial<Player>) {
-    if (!isAdminMode || isDrawLocked) {
-      return
-    }
-
-    if (isBackendDataReady) {
-      try {
-        await updatePlayer(playerId, {
-          firstName: updates.firstName,
-          lastName: updates.lastName,
-          displayName: updates.displayName,
-          avatarId: updates.avatarId,
-        })
-        await backendGameData.reload()
-        setDraftAssignments([])
-        setDrawActionMessage(null)
-      } catch (error) {
-        setDrawActionMessage(
-          error instanceof Error
-            ? `Could not update the player: ${error.message}`
-            : 'Could not update the player because of an unknown error.',
-        )
-      }
-      return
-    }
-
-    setLocalPlayers((currentPlayers) =>
-      currentPlayers.map((player) =>
-        player.id === playerId
-          ? {
-              ...player,
-              ...updates,
-            }
-          : player,
-      ),
-    )
-
-    setDraftAssignments([])
-    setDrawActionMessage(null)
-  }
-
-  function handleResetPlayers() {
-    if (!isAdminMode || isDrawLocked || isBackendDataReady) {
-      return
-    }
-
-    resetPlayers()
-    setDraftAssignments([])
-    setDrawActionMessage(null)
   }
 
   async function handleUpdateMatch(matchId: string, updates: Partial<Match>) {
@@ -434,48 +162,31 @@ function App() {
       return
     }
 
-    if (isBackendDataReady) {
-      try {
-        await updateMatch(matchId, {
-          status: updates.status,
-          homeScore: updates.homeScore,
-          awayScore: updates.awayScore,
-        })
-        await backendGameData.reload()
-      } catch (error) {
-        setDrawActionMessage(
-          error instanceof Error
-            ? `Could not update the match: ${error.message}`
-            : 'Could not update the match because of an unknown error.',
-        )
-      }
-      return
+    try {
+      await updateMatch(matchId, {
+        status: updates.status,
+        homeScore: updates.homeScore,
+        awayScore: updates.awayScore,
+      })
+      await backendGameData.reload()
+    } catch (error) {
+      setDrawActionMessage(
+        error instanceof Error
+          ? `Could not update the match: ${error.message}`
+          : 'Could not update the match because of an unknown error.',
+      )
     }
-
-    setLocalMatches((currentMatches) =>
-      currentMatches.map((match) =>
-        match.id === matchId
-          ? {
-              ...match,
-              ...updates,
-            }
-          : match,
-      ),
-    )
   }
 
   function handleResetMatches() {
-    if (!isAdminMode || isBackendDataReady) {
-      return
-    }
-
-    resetMatches()
+    // Manual bulk reset is intentionally a no-op for the survivor tournament;
+    // knockout results are edited individually via the admin panel.
   }
 
   if (adminAuthStatus === 'checking') {
     return (
       <main className="flex min-h-screen items-center justify-center px-6 py-6 text-slate-950">
-        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">
+        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[var(--pitch-700)]">
           Loading…
         </p>
       </main>
@@ -485,42 +196,41 @@ function App() {
   return (
     <main className="min-h-screen px-6 py-6 text-slate-950 sm:px-8 lg:px-12">
       <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <AppHeader milestone="Version 5.7.5" />
+        <AppHeader milestone="World Cup Survivor" />
         <AppNavigation />
 
-        <TournamentSelector
-          tournaments={tournamentList.tournaments}
-          activeTournamentId={activeTournamentId}
-          isLoading={tournamentList.status === 'loading'}
-          onSelect={handleSelectTournament}
-        />
-
         <section className="grid gap-4 md:grid-cols-4">
-          <MetricCard label="Tournament" value={activeTournament.name} />
-          <MetricCard label="Players" value={`${drawReadiness.playerCount} / 6`} />
-          <MetricCard label="Eligible Teams" value={drawReadiness.eligibleTeamCount} />
-          <MetricCard label="Completed Matches" value={completedMatchCount} />
+          <MetricCard label="Tournament" value={tournament?.name ?? 'World Cup Survivor'} />
+          <MetricCard label="Players" value={players.length} />
+          <MetricCard label="Still Alive" value={`${alivePlayers} / ${players.length}`} />
+          <MetricCard label="Knockout Results" value={completedMatches} />
         </section>
 
-        <article className="rounded-3xl border border-slate-900/10 bg-white/80 p-6 shadow-sm">
+        {backendGameData.status === 'error' && (
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
+            Could not load the survivor tournament from the backend. Make sure the migration has run
+            and the Worker is deployed. Error: {backendGameData.errorMessage}
+          </div>
+        )}
+
+        <article className="rounded-3xl border border-[var(--pitch-900)]/10 bg-white/85 p-6 shadow-sm sm:p-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-700">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--pitch-700)]">
                 Access Mode
               </p>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight">
-                {isAdminMode ? 'Admin controls enabled.' : 'Public viewer mode enabled.'}
+              <h2 className="font-display mt-3 text-2xl font-bold uppercase tracking-tight text-[var(--ink-900)]">
+                {isAdminMode ? 'Admin controls enabled' : 'Public viewer mode'}
               </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--ink-600)]">
                 {isAdminMode
-                  ? 'You are using the protected admin route. Tournament setup, player setup, match admin, draw controls, and the admin guide are available.'
-                  : 'This is the public read-only view. Tournament setup, player setup, match admin, and draw controls are hidden.'}
+                  ? 'Run the draw, lock team assignments, and record knockout results below.'
+                  : 'Read-only view of the survivor standings and bracket.'}
               </p>
             </div>
-
             <span
               className={`w-fit rounded-full px-4 py-2 text-sm font-semibold ${
-                isAdminMode ? 'bg-slate-950 text-white' : 'bg-emerald-100 text-emerald-800'
+                isAdminMode ? 'bg-[var(--pitch-900)] text-white' : 'bg-emerald-100 text-emerald-800'
               }`}
             >
               {isAdminMode ? 'Admin' : 'Public Viewer'}
@@ -528,110 +238,77 @@ function App() {
           </div>
         </article>
 
-        {backendGameData.status === 'error' && (
-          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
-            Backend game data is not available yet, so the app is temporarily using local fallback
-            data. Start the Worker with <code>npm run worker:dev</code>. Error:{' '}
-            {backendGameData.errorMessage}
-          </div>
-        )}
-
-        {backendDraw.status === 'error' && (
-          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
-            Backend draw data is not available yet, so the app is temporarily using local fallback
-            draw state. Start the Worker with <code>npm run worker:dev</code>. Error:{' '}
-            {backendDraw.errorMessage}
-          </div>
-        )}
-
-        {isAdminMode && <ApiStatusPanel />}
-
-        {isAdminMode && <DataSourcePanel />}
-
-        {isAdminMode && <AdminGuidePanel />}
-
-        {!isDrawLocked && !isAdminMode && (
-          <article className="rounded-3xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-700">
-              Draw Pending
+        {/* Draw controls (admin only) */}
+        {isAdminMode && (
+          <article className="rounded-3xl border border-[var(--pitch-900)]/10 bg-white/85 p-6 shadow-sm sm:p-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--pitch-700)]">
+              Draw Control
             </p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-amber-950">
-              The tournament draw has not been locked yet.
+            <div className="chalk-rule mt-3" />
+            <h2 className="font-display mt-4 text-2xl font-bold uppercase tracking-tight text-[var(--ink-900)]">
+              Assign teams to players
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-amber-900">
-              Once the admin runs and locks the draw, player team assignments will appear in the
-              leaderboard and remain visible after refresh.
+            <p className="mt-3 max-w-2xl leading-7 text-[var(--ink-600)]">
+              Each player receives {teamsPerPlayer} teams, drawn together. Needs exactly{' '}
+              {players.length * teamsPerPlayer} eligible teams ({players.length} players ×{' '}
+              {teamsPerPlayer}). Currently {eligibleTeams.length} eligible.
+            </p>
+
+            {drawActionMessage && (
+              <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-950">
+                {drawActionMessage}
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={handleRunDraw}
+                disabled={isDrawLocked}
+                className="rounded-full bg-[var(--pitch-900)] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--pitch-800)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Run Draw
+              </button>
+              <button
+                type="button"
+                onClick={isSavingDraw ? undefined : handleSaveAndLockDraw}
+                disabled={draftAssignments.length === 0 || isDrawLocked || isSavingDraw}
+                className="rounded-full bg-[var(--lime-400)] px-5 py-3 text-sm font-bold uppercase tracking-wide text-[var(--pitch-900)] shadow-sm transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isSavingDraw ? 'Saving…' : 'Save & Lock'}
+              </button>
+              <button
+                type="button"
+                onClick={handleResetLockedDraw}
+                disabled={!isDrawLocked}
+                className="rounded-full border border-[var(--pitch-900)]/15 bg-white px-5 py-3 text-sm font-semibold text-[var(--ink-900)] shadow-sm transition hover:border-[var(--pitch-700)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Reset Draw
+              </button>
+            </div>
+
+            <p className="mt-4 text-xs uppercase tracking-[0.18em] text-[var(--ink-600)]">
+              {isDrawLocked
+                ? 'Draw is locked.'
+                : draftAssignments.length > 0
+                  ? 'Draft ready — save to lock.'
+                  : 'No draw yet.'}
             </p>
           </article>
         )}
 
-        {isAdminMode && (
-          <>
-            <TournamentSetupPanel
-              tournament={activeTournament}
-              isLocked={isDrawLocked}
-              isReadOnly={false}
-              statusLabel={undefined}
-              readOnlyReason={undefined}
-              onUpdateTournament={handleUpdateTournament}
-              onResetTournament={handleResetTournament}
-            />
+        {/* Standings table */}
+        <SurvivorLeaderboardPanel players={players} teams={teams} standings={standings} />
 
-            <PlayerSetupPanel
-              players={tournamentPlayers}
-              isLocked={isDrawLocked}
-              isReadOnly={false}
-              statusLabel={undefined}
-              readOnlyReason={undefined}
-              onUpdatePlayer={handleUpdatePlayer}
-            />
-
-            {!isDrawLocked && !isBackendDataReady && (
-              <div className="-mt-4 flex justify-end">
-                <button
-                  className="rounded-full border border-slate-900/10 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-700 hover:text-emerald-800"
-                  onClick={handleResetPlayers}
-                  type="button"
-                >
-                  Reset Players
-                </button>
-              </div>
-            )}
-
-            {drawActionMessage && (
-              <article className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm font-semibold leading-6 text-amber-950">
-                {drawActionMessage}
-              </article>
-            )}
-
-            <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-              <EligibleTeamsPanel
-                eligibleTeams={eligibleTeams}
-                ineligibleTeams={ineligibleTeams}
-                drawReadiness={drawReadiness}
-              />
-
-              <DrawControlPanel
-                players={tournamentPlayers}
-                teams={teams}
-                draftAssignments={draftAssignments}
-                lockedAssignments={lockedAssignments}
-                drawReadiness={drawReadiness}
-                onRunDraw={handleRunDraw}
-                onSaveAndLock={isSavingDraw ? () => undefined : handleSaveAndLockDraw}
-                onResetLockedDraw={handleResetLockedDraw}
-              />
-            </section>
-          </>
-        )}
-
-        <LeaderboardPanel
-          players={tournamentPlayers}
+        {/* Bracket */}
+        <SurvivorBracketPanel
+          players={players}
           teams={teams}
+          matches={matches}
           assignments={activeAssignments}
-          standings={standings}
         />
 
+        {/* Match admin (admin only) */}
         {isAdminMode && (
           <MatchAdminPanel
             matches={matches}
@@ -642,12 +319,6 @@ function App() {
             onUpdateMatch={handleUpdateMatch}
             onResetMatches={handleResetMatches}
           />
-        )}
-
-        <MatchResultsPanel matches={matches} teams={teams} scoringRules={scoringRules} />
-
-        {isAdminMode && (
-          <FeatureSections adminSections={adminSections} viewerSections={viewerSections} />
         )}
 
         <AppFooter />
